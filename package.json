@@ -14,7 +14,7 @@
     "@google/genai": "^1.38.0",
     "lucide-react": "^0.563.0",
     "leaflet": "^1.9.4",
-    "firebase": "^12.8.0"
+    "firebase": "^10.8.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

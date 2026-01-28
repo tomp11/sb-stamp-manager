@@ -1,23 +1,18 @@
 
-// Use namespace imports to resolve "no exported member" issues in some environments
-import * as firebaseApp from "firebase/app";
-import * as firebaseAuth from "firebase/auth";
-import * as firebaseFirestore from "firebase/firestore";
-
-// Extract modular functions from namespaces
-const { initializeApp } = firebaseApp;
-const { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } = firebaseAuth;
-const { getFirestore } = firebaseFirestore;
+// Use named imports to properly resolve symbols and types from the Firebase SDK
+// Fix: Switched from namespace imports to named imports to resolve "no exported member" and property access errors
+import { initializeApp, FirebaseApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, Auth } from "firebase/auth";
+import { getFirestore, Firestore } from "firebase/firestore";
 
 // Export types correctly
-export type FirebaseApp = firebaseApp.FirebaseApp;
-export type Auth = firebaseAuth.Auth;
-export type Firestore = firebaseFirestore.Firestore;
+export type { FirebaseApp, Auth, Firestore };
 
 export interface FirebaseInstance {
   app: FirebaseApp;
   auth: Auth;
   db: Firestore;
+  // Fix: Named import of GoogleAuthProvider class is now correctly recognized as a type for the instance
   googleProvider: GoogleAuthProvider;
 }
 
@@ -27,13 +22,17 @@ let instance: FirebaseInstance | null = null;
 export const initFirebase = async (): Promise<FirebaseInstance> => {
   if (instance) return instance;
 
+  // Safe access to process.env
+  // Fix: Cast process to any to safely check for env in various browser/build environments
+  const env = (typeof process !== 'undefined' && (process as any).env) ? (process as any).env : {};
+
   const firebaseConfig = {
-    apiKey: process.env.VITE_FIREBASE_API_KEY,
-    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.VITE_FIREBASE_APP_ID
+    apiKey: env.VITE_FIREBASE_API_KEY,
+    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: env.VITE_FIREBASE_APP_ID
   };
 
   if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
