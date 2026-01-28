@@ -1,0 +1,236 @@
+
+import React, { useState, useEffect } from 'react';
+import { StoreStamp, UserProfile } from './types';
+import Uploader from './components/Uploader';
+import StoreList from './components/StoreList';
+import StoreMap from './components/StoreMap';
+import ErrorBoundary from './components/ErrorBoundary';
+import { useStamps } from './hooks/useStamps';
+// Import initialized auth functions from our firebase service to ensure consistency
+import { initFirebase, onAuthStateChanged, signInWithPopup, signOut } from './services/firebase';
+import { Coffee, List, Map, Trophy, AlertCircle, X, Loader2, LogIn, LogOut, Cloud, CheckCircle2 } from 'lucide-react';
+
+const App: React.FC = () => {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const { stamps, isLoading: stampsLoading, isSyncing, addStamps, deleteStamp, migrateLocalToCloud } = useStamps(user?.id || null);
+  const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
+  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // 起動時のAuth監視（環境変数があれば）
+  useEffect(() => {
+    const monitorAuth = async () => {
+      try {
+        const { auth } = await initFirebase();
+        
+        // Use the imported onAuthStateChanged which is properly resolved
+        onAuthStateChanged(auth, (firebaseUser) => {
+          if (firebaseUser) {
+            const profile = {
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || 'User',
+              email: firebaseUser.email || '',
+              picture: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Starbucks'
+            };
+            setUser(profile);
+            // ログイン成功時にマイグレーション
+            migrateLocalToCloud(firebaseUser.uid);
+          } else {
+            setUser(null);
+          }
+          setAuthLoading(false);
+        });
+      } catch (e) {
+        // 環境変数がない場合は監視をスキップ（ゲストモード固定）
+        setAuthLoading(false);
+      }
+    };
+
+    monitorAuth();
+  }, [migrateLocalToCloud]);
+
+  const handleLogin = async () => {
+    try {
+      const { auth, googleProvider } = await initFirebase();
+      
+      // Use the imported signInWithPopup which is properly resolved
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result.user) {
+        const profile = {
+          id: result.user.uid,
+          name: result.user.displayName || 'User',
+          email: result.user.email || '',
+          picture: result.user.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Starbucks'
+        };
+        setUser(profile);
+        await migrateLocalToCloud(result.user.uid);
+      }
+    } catch (error: any) {
+      setGlobalError(error.message || "ログインに失敗しました。ゲストモードで継続できます。");
+    }
+  };
+
+  const handleLogout = async () => {
+    if (!confirm('ログアウトしますか？')) return;
+    try {
+      const { auth } = await initFirebase();
+      // Use the imported signOut which is properly resolved
+      await signOut(auth);
+      setUser(null);
+    } catch (error) {
+      setGlobalError("ログアウト中にエラーが発生しました。");
+    }
+  };
+
+  const storeCount = new Set(stamps.map(s => s.storeName)).size;
+  const prefCount = new Set(stamps.map(s => s.prefecture)).size;
+
+  if (stampsLoading || authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-[#00704A] animate-spin mx-auto mb-4" />
+          <p className="text-gray-500 font-medium">コレクションを準備中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ErrorBoundary>
+      <div className="min-h-screen bg-[#f3f4f6] pb-24 font-sans">
+        {globalError && (
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-xl animate-in slide-in-from-top-4">
+            <div className="bg-red-600 text-white p-4 rounded-xl shadow-2xl flex items-center justify-between border-2 border-white/20">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-6 h-6 shrink-0" />
+                <p className="text-sm font-bold">{globalError}</p>
+              </div>
+              <button onClick={() => setGlobalError(null)} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <header className="bg-[#00704A] text-white shadow-lg sticky top-0 z-50">
+          <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-white p-1.5 rounded-full shadow-inner">
+                  <Coffee className="w-5 h-5 text-[#00704A]" />
+                </div>
+                <h1 className="text-lg font-bold tracking-tight">
+                  Stamp Master
+                </h1>
+              </div>
+              <nav className="flex items-center bg-black/10 rounded-full p-1 ml-2">
+                <button 
+                  onClick={() => setActiveTab('list')}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === 'list' ? 'bg-white text-[#00704A] shadow-sm' : 'text-white/80 hover:text-white'}`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  リスト
+                </button>
+                <button 
+                  onClick={() => setActiveTab('map')}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === 'map' ? 'bg-white text-[#00704A] shadow-sm' : 'text-white/80 hover:text-white'}`}
+                >
+                  <Map className="w-3.5 h-3.5" />
+                  マップ
+                </button>
+              </nav>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {user && (
+                <div className="flex items-center gap-1.5 text-[10px] bg-white/10 px-2.5 py-1 rounded-full font-bold">
+                  {isSyncing ? <Cloud className="w-3 h-3 animate-pulse" /> : <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+                  <span className="hidden sm:inline">{isSyncing ? '同期中' : '同期済み'}</span>
+                </div>
+              )}
+
+              {user ? (
+                <div className="flex items-center gap-3 pl-3 border-l border-white/20 group relative">
+                   <div className="text-right hidden sm:block">
+                      <p className="text-[10px] text-emerald-100 font-bold leading-none">Cloud Connected</p>
+                      <p className="text-xs font-bold leading-tight truncate max-w-[100px]">{user.name}</p>
+                   </div>
+                   <img 
+                    src={user.picture} 
+                    alt={user.name} 
+                    className="w-9 h-9 rounded-full border border-white/30 cursor-pointer"
+                   />
+                   <button 
+                      onClick={handleLogout}
+                      className="absolute top-11 right-0 bg-white text-gray-800 px-4 py-2 rounded-xl text-xs font-bold shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all flex items-center gap-2 border border-gray-100 whitespace-nowrap"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      ログアウト
+                    </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={handleLogin}
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#00704A] hover:bg-emerald-50 rounded-full text-xs font-bold transition-all shadow-md"
+                >
+                  <LogIn className="w-4 h-4" />
+                  ログイン
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        <main className="max-w-6xl mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-4 space-y-6">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative group">
+                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <Trophy className="w-24 h-24" />
+                </div>
+                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-6">Your Progress</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <p className="text-[10px] text-emerald-600 font-black mb-1 uppercase">Stores</p>
+                    <div className="flex items-baseline gap-1">
+                      <p className="text-4xl font-black text-[#00704A] tracking-tighter">{storeCount}</p>
+                      <p className="text-xs font-bold text-[#00704A]/60">pts</p>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                    <p className="text-[10px] text-amber-600 font-black mb-1 uppercase">Areas</p>
+                    <div className="flex items-baseline gap-1">
+                      <p className="text-4xl font-black text-amber-700 tracking-tighter">{prefCount}</p>
+                      <p className="text-xs font-bold text-amber-700/60">pref</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Uploader onAddStamps={addStamps} />
+            </div>
+
+            <div className="lg:col-span-8">
+              {activeTab === 'list' ? (
+                <StoreList stamps={stamps} onDelete={deleteStamp} />
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
+                    <h3 className="font-bold text-gray-700 flex items-center gap-2 px-2">
+                      <div className="w-2 h-2 rounded-full bg-[#00704A]" />
+                      店舗分布マップ
+                    </h3>
+                  </div>
+                  <StoreMap stamps={stamps} />
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
+    </ErrorBoundary>
+  );
+};
+
+export default App;

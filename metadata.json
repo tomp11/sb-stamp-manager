@@ -1,0 +1,8 @@
+{
+  "name": "Starbucks My Store Passport Manager",
+  "description": "An AI-powered dashboard to manage your Starbucks My Store Passport stamps. Upload your stamp images and automatically extract store details, visit history, and addresses using Gemini AI, then visualize them on a map.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
