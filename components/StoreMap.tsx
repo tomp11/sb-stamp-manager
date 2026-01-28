@@ -16,6 +16,15 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
   const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
   const [isLocating, setIsLocating] = useState(false);
 
+  // 地図のサイズを再計算させる（空白対策）
+  const fixMapSize = useCallback(() => {
+    if (mapRef.current) {
+      setTimeout(() => {
+        mapRef.current?.invalidateSize();
+      }, 100);
+    }
+  }, []);
+
   // 現在地へジャンプする関数
   const handleRecenter = useCallback(() => {
     if (mapRef.current && userCoords) {
@@ -40,14 +49,17 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
           center: [35.6812, 139.7671], // デフォルト東京駅
           zoom: 13,
           scrollWheelZoom: true,
-          zoomControl: false // カスタム位置に配置するため無効化
+          zoomControl: false 
         });
 
         L.control.zoom({ position: 'bottomright' }).addTo(mapRef.current);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors'
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(mapRef.current);
+
+        // 初回描画の安定化
+        fixMapSize();
       } catch (e) {
         console.error("Leaflet init error:", e);
         return;
@@ -98,7 +110,7 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
       }
     });
 
-    // 現在地の取得と地図のセンタリング
+    // 現在地の取得
     if (navigator.geolocation) {
       setIsLocating(true);
       navigator.geolocation.getCurrentPosition(
@@ -108,7 +120,7 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
           setUserCoords(coords);
 
           if (mapRef.current) {
-            // 現在地を示すマーカー（サークル）
+            // 現在地マーカー
             userLocationMarkerRef.current = L.circle(coords, {
               radius: 100,
               color: '#00704A',
@@ -117,7 +129,8 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
               weight: 3
             }).addTo(mapRef.current).bindPopup("現在地");
 
-            // ★ ユーザーの要望：現在地を中心に設定
+            // マップサイズを再計算してから移動
+            fixMapSize();
             mapRef.current.setView(coords, 14);
           }
           setIsLocating(false);
@@ -125,16 +138,21 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
         (error) => {
           console.warn("Geolocation error:", error);
           setIsLocating(false);
-          // 位置情報が取れない場合はスタンプ全体にフィットさせる
           if (markersRef.current.length > 0 && mapRef.current) {
             const group = L.featureGroup(markersRef.current);
             mapRef.current.fitBounds(group.getBounds().pad(0.1));
           }
+          fixMapSize();
         },
         { enableHighAccuracy: true, timeout: 5000 }
       );
     }
-  }, [stamps]);
+  }, [stamps, fixMapSize]);
+
+  // マウント時に一度確実に再計算させる
+  useEffect(() => {
+    fixMapSize();
+  }, [fixMapSize]);
 
   useEffect(() => {
     return () => {

@@ -1,9 +1,12 @@
 
 // Use named imports to properly resolve symbols and types from the Firebase SDK
-// Fix: Consolidated value and type imports into single statements to resolve resolution issues in certain environments
-import { initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+// Fix: Separated value and type imports to resolve resolution issues in certain environments where inline 'type' imports are not supported or cause member resolution failure.
+import { initializeApp } from "firebase/app";
+import type { FirebaseApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import type { Auth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import type { Firestore } from "firebase/firestore";
 
 // Export types correctly
 export type { FirebaseApp, Auth, Firestore };
