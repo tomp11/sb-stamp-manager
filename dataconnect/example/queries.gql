@@ -1,0 +1,40 @@
+mutation AddStampToCollection($collectionId: UUID!, $stampId: UUID!, $note: String) @auth(level: USER) {
+  collectionStamp_insert(data: {
+    collectionId: $collectionId,
+    stampId: $stampId,
+    addedAt_expr: "request.time",
+    note: $note
+  })
+}
+
+query ListPublicCollections @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  collections(where: {isPublic: {eq: true}}) {
+    id
+    name
+    description
+    owner {
+      id
+      username
+    }
+  }
+}
+
+mutation CreateStamp($name: String!, $country: String!, $yearOfIssue: Int!) @auth(level: USER) {
+  stamp_insert(data: {
+    ownerId_expr: "auth.uid",
+    name: $name,
+    country: $country,
+    yearOfIssue: $yearOfIssue,
+    createdAt_expr: "request.time"
+  })
+}
+
+query GetMyStamps @auth(level: USER) {
+  stamps(where: {ownerId: {eq_expr: "auth.uid"}}) {
+    id
+    name
+    country
+    yearOfIssue
+    imageUrl
+  }
+}

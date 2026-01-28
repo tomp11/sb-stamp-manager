@@ -22,7 +22,7 @@ const App: React.FC = () => {
     const monitorAuth = async () => {
       try {
         const { auth } = await initFirebase();
-        
+
         // Use the imported onAuthStateChanged which is properly resolved
         onAuthStateChanged(auth, (firebaseUser) => {
           if (firebaseUser) {
@@ -52,7 +52,7 @@ const App: React.FC = () => {
   const handleLogin = async () => {
     try {
       const { auth, googleProvider } = await initFirebase();
-      
+
       // Use the imported signInWithPopup which is properly resolved
       const result = await signInWithPopup(auth, googleProvider);
       if (result.user) {
@@ -125,14 +125,14 @@ const App: React.FC = () => {
                 </h1>
               </div>
               <nav className="flex items-center bg-black/10 rounded-full p-1 ml-2">
-                <button 
+                <button
                   onClick={() => setActiveTab('list')}
                   className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === 'list' ? 'bg-white text-[#00704A] shadow-sm' : 'text-white/80 hover:text-white'}`}
                 >
                   <List className="w-3.5 h-3.5" />
                   リスト
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveTab('map')}
                   className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === 'map' ? 'bg-white text-[#00704A] shadow-sm' : 'text-white/80 hover:text-white'}`}
                 >
@@ -141,7 +141,7 @@ const App: React.FC = () => {
                 </button>
               </nav>
             </div>
-            
+
             <div className="flex items-center gap-3">
               {user && (
                 <div className="flex items-center gap-1.5 text-[10px] bg-white/10 px-2.5 py-1 rounded-full font-bold">
@@ -152,25 +152,25 @@ const App: React.FC = () => {
 
               {user ? (
                 <div className="flex items-center gap-3 pl-3 border-l border-white/20 group relative">
-                   <div className="text-right hidden sm:block">
-                      <p className="text-[10px] text-emerald-100 font-bold leading-none">Cloud Connected</p>
-                      <p className="text-xs font-bold leading-tight truncate max-w-[100px]">{user.name}</p>
-                   </div>
-                   <img 
-                    src={user.picture} 
-                    alt={user.name} 
+                  <div className="text-right hidden sm:block">
+                    <p className="text-[10px] text-emerald-100 font-bold leading-none">Cloud Connected</p>
+                    <p className="text-xs font-bold leading-tight truncate max-w-[100px]">{user.name}</p>
+                  </div>
+                  <img
+                    src={user.picture}
+                    alt={user.name}
                     className="w-9 h-9 rounded-full border border-white/30 cursor-pointer"
-                   />
-                   <button 
-                      onClick={handleLogout}
-                      className="absolute top-11 right-0 bg-white text-gray-800 px-4 py-2 rounded-xl text-xs font-bold shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all flex items-center gap-2 border border-gray-100 whitespace-nowrap"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      ログアウト
-                    </button>
+                  />
+                  <button
+                    onClick={handleLogout}
+                    className="absolute top-11 right-0 bg-white text-gray-800 px-4 py-2 rounded-xl text-xs font-bold shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all flex items-center gap-2 border border-gray-100 whitespace-nowrap"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    ログアウト
+                  </button>
                 </div>
               ) : (
-                <button 
+                <button
                   onClick={handleLogin}
                   className="flex items-center gap-2 px-4 py-2 bg-white text-[#00704A] hover:bg-emerald-50 rounded-full text-xs font-bold transition-all shadow-md"
                 >
