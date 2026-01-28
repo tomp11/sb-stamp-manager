@@ -1,9 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-// テスト用のサンプルデータ：単体詳細（データあり）と一覧（データなし）を混在
+// テスト用のサンプルデータ
 const MOCK_DATA = [
   {
     storeName: "函館五稜郭公園前店",
@@ -18,8 +16,8 @@ const MOCK_DATA = [
     storeName: "スターバックス リザーブ ロースタリー 東京",
     prefecture: "東京都",
     address: "東京都 目黒区 青葉台2-19-23",
-    lastVisitDate: undefined, // データなし（一覧画像からの解析を想定）
-    visitCount: undefined,    // データなし（一覧画像からの解析を想定）
+    lastVisitDate: undefined,
+    visitCount: undefined,
     latitude: 35.6491,
     longitude: 139.6925
   },
@@ -31,15 +29,6 @@ const MOCK_DATA = [
     visitCount: 1,
     latitude: 33.5215,
     longitude: 130.5310
-  },
-  {
-    storeName: "京都三条大橋店",
-    prefecture: "京都府",
-    address: "京都府 京都市 中京区 三条通河原町東入中島町113",
-    lastVisitDate: undefined, // データなし
-    visitCount: undefined,    // データなし
-    latitude: 35.0092,
-    longitude: 135.7721
   }
 ];
 
@@ -50,17 +39,24 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
     return MOCK_DATA;
   }
 
+  // APIキーの取得（シムによってセットされた process.env.API_KEY を使用）
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey || apiKey.includes('あなたの')) {
+    throw new Error(
+      "Gemini APIキーが設定されていません。.env ファイルの VITE_GEMINI_API_KEY に有効なキーを入力してください。"
+    );
+  }
+
+  // 規約に基づき GoogleGenAI インスタンスを生成
+  const ai = new GoogleGenAI({ apiKey });
+
   console.log("Gemini API: 解析開始...");
   const model = 'gemini-3-flash-preview';
   
   const prompt = `
     You are an OCR engine for Starbucks Japan "My Store Passport".
     The input can be a SINGLE stamp detail page OR a GRID/LIST of multiple stamps.
-
-    IMPORTANT RULES FOR MULTI-STAMP IMAGES:
-    - Grid/List views usually ONLY show the store name and medal.
-    - If lastVisitDate or visitCount are NOT explicitly visible on the image, return them as NULL.
-    - Do NOT guess or invent dates/counts.
 
     EXTRACTION FIELDS:
     1. storeName: EXACT name (e.g., "目黒店"). 

@@ -3,11 +3,39 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-// Shim for process.env in browser environment
-// Fix: Added cast to any for window to avoid property 'process' does not exist error
-if (typeof window !== 'undefined' && !(window as any).process) {
-  (window as any).process = { env: {} } as any;
-}
+/**
+ * Vite環境 (import.meta.env) と一般的な Node 形式 (process.env) の互換性を確保するためのシム
+ */
+const setupEnvShim = () => {
+  if (typeof window === 'undefined') return;
+
+  const anyWin = window as any;
+  if (!anyWin.process) {
+    anyWin.process = { env: {} };
+  }
+
+  try {
+    // Vite (import.meta.env) が存在する場合、その内容を process.env に統合
+    // @ts-ignore
+    const viteEnv = import.meta.env;
+    if (viteEnv) {
+      // VITE_ で始まる変数をすべて process.env にコピー
+      Object.assign(anyWin.process.env, viteEnv);
+      
+      // Gemini API 向けの特別なマッピング
+      // SDK は process.env.API_KEY を期待するため、VITE_GEMINI_API_KEY などを転送
+      const apiKey = viteEnv.VITE_GEMINI_API_KEY || viteEnv.VITE_API_KEY || viteEnv.API_KEY;
+      if (apiKey && !anyWin.process.env.API_KEY) {
+        anyWin.process.env.API_KEY = apiKey;
+      }
+    }
+  } catch (e) {
+    console.debug("Env shim failed (not a Vite environment?):", e);
+  }
+};
+
+// アプリ起動前にシムを確実に実行
+setupEnvShim();
 
 // Global error handler for non-React errors
 window.onerror = function(message, source, lineno, colno, error) {
@@ -29,7 +57,7 @@ window.onunhandledrejection = function(event) {
   console.error("Unhandled Promise Rejection:", event.reason);
 };
 
-console.log("App initializing...");
+console.log("App initialized with environment shim.");
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

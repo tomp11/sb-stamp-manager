@@ -1,9 +1,9 @@
 
 // Use named imports to properly resolve symbols and types from the Firebase SDK
-// Fix: Switched from namespace imports to named imports to resolve "no exported member" and property access errors
-import { initializeApp, FirebaseApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, Auth } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+// Fix: Consolidated value and type imports into single statements to resolve resolution issues in certain environments
+import { initializeApp, type FirebaseApp } from "firebase/app";
+import { getAuth, type Auth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
 
 // Export types correctly
 export type { FirebaseApp, Auth, Firestore };
@@ -12,7 +12,7 @@ export interface FirebaseInstance {
   app: FirebaseApp;
   auth: Auth;
   db: Firestore;
-  // Fix: Named import of GoogleAuthProvider class is now correctly recognized as a type for the instance
+  // Named import of GoogleAuthProvider class is now correctly recognized as a type for the instance
   googleProvider: GoogleAuthProvider;
 }
 

@@ -2,7 +2,6 @@
   "name": "starbucks-my-store-passport-manager",
   "private": true,
   "version": "0.0.0",
-  "homepage": ".",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,13 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@dataconnect/generated": "file:src/dataconnect-generated",
-    "@google/genai": "^1.38.0",
-    "firebase": "^12.8.0",
-    "leaflet": "^1.9.4",
-    "lucide-react": "^0.563.0",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react-dom": "^19.2.3",
+    "@google/genai": "^1.38.0",
+    "lucide-react": "^0.563.0",
     "leaflet": "^1.9.4",
     "firebase": "^10.8.0"
   },
