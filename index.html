@@ -43,15 +43,17 @@
     "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
     "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
     "leaflet": "https://esm.sh/leaflet@^1.9.4",
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-    "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
-    "firebase/": "https://esm.sh/firebase@^12.8.0/"
+    "firebase/app": "https://esm.sh/firebase@^10.8.0/app",
+    "firebase/auth": "https://esm.sh/firebase@^10.8.0/auth",
+    "firebase/firestore": "https://esm.sh/firebase@^10.8.0/firestore",
+    "firebase/": "https://esm.sh/firebase@^10.8.0/"
   }
 }
 </script>
 </head>
 <body>
     <div id="root"></div>
+    <!-- エントリーポイントの追加 -->
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>
