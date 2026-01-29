@@ -1,27 +1,39 @@
-// Separating type and value imports to resolve potential 'no exported member' errors in modular SDK environments
-import { initializeApp } from "firebase/app";
-import type { FirebaseApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import type { Auth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import type { Firestore } from "firebase/firestore";
+// Fix: Consolidate modular Firebase imports to resolve "no exported member" errors in certain environments
+import { initializeApp, type FirebaseApp } from "firebase/app";
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  signOut,
+  type Auth 
+} from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
 
-// Safe helper to access environment variables without ReferenceError
-const safeGetEnv = (key: string): string | undefined => {
-  try {
-    return (typeof process !== 'undefined' && process.env) ? process.env[key] : undefined;
-  } catch {
-    return undefined;
+// 指定された優先順位で環境変数を取得するヘルパー
+const getEnv = (key: string): string | undefined => {
+  const viteKey = `VITE_FIREBASE_${key}`;
+  const directKey = `FIREBASE_${key}`;
+  
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+    const val = (import.meta as any).env[viteKey];
+    if (val) return val;
   }
+  
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[viteKey] || process.env[directKey];
+  }
+  
+  return undefined;
 };
 
 const firebaseConfig = {
-  apiKey: safeGetEnv('FIREBASE_API_KEY'),
-  authDomain: safeGetEnv('FIREBASE_AUTH_DOMAIN'),
-  projectId: safeGetEnv('FIREBASE_PROJECT_ID'),
-  storageBucket: safeGetEnv('FIREBASE_STORAGE_BUCKET'),
-  messagingSenderId: safeGetEnv('FIREBASE_MESSAGING_SENDER_ID'),
-  appId: safeGetEnv('FIREBASE_APP_ID')
+  apiKey: getEnv('API_KEY'),
+  authDomain: getEnv('AUTH_DOMAIN'),
+  projectId: getEnv('PROJECT_ID'),
+  storageBucket: getEnv('STORAGE_BUCKET'),
+  messagingSenderId: getEnv('MESSAGING_SENDER_ID'),
+  appId: getEnv('APP_ID')
 };
 
 let app: FirebaseApp | null = null;
@@ -31,10 +43,8 @@ const googleProvider = new GoogleAuthProvider();
 
 const isConfigValid = !!firebaseConfig.apiKey && !!firebaseConfig.projectId;
 
-// Use modern named exports and modular initialization for Firebase v9+ to ensure reliability
 if (isConfigValid) {
   try {
-    // Initializing Firebase App, Auth, and Firestore using modular SDK functions
     app = initializeApp(firebaseConfig as any);
     auth = getAuth(app);
     db = getFirestore(app);
@@ -43,10 +53,6 @@ if (isConfigValid) {
   }
 }
 
-/**
- * Returns the shared Firebase instances for Auth, Firestore, and Google Provider.
- * Throws an error if configuration is invalid or services failed to start.
- */
 export const getFirebaseInstance = () => {
   if (!isConfigValid || !auth || !db) {
     throw new Error("Firebase is not configured or failed to initialize.");
@@ -56,6 +62,5 @@ export const getFirebaseInstance = () => {
 
 export const initFirebase = async () => getFirebaseInstance();
 
-// Named exports for modular Auth methods and types to support tree-shaking and type safety
 export { onAuthStateChanged, signInWithPopup, signOut };
 export type { Auth, Firestore, FirebaseApp };

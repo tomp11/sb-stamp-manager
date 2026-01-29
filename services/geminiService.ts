@@ -1,5 +1,5 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
+import '../shim';
 
 // テスト用のサンプルデータ
 const MOCK_DATA = [
@@ -39,13 +39,11 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
     return MOCK_DATA;
   }
 
-  // Guidelines: ALWAYS use const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-  // const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const key = import.meta.env?.VITE_GEMINI_API_KEY || process.env?.API_KEY;
   const ai = new GoogleGenAI({ apiKey: key as string });
 
-  const modelName = 'gemini-3-flash-preview';
-
+  console.log("Gemini API: 解析開始...");
+  
   const prompt = `
     あなたはスターバックスの「マイストアパスポート」のスタンプ画像を解析する専門家です。
     画像から以下の情報を抽出し、JSON形式で返却してください。
@@ -73,8 +71,9 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
   };
 
   try {
+    // CRITICAL: Use ai.models.generateContent directly with model name and parts
     const response = await ai.models.generateContent({
-      model: modelName,
+      model: 'gemini-3-flash-preview',
       contents: { parts: [imagePart, { text: prompt }] },
       config: {
         responseMimeType: "application/json",
@@ -103,9 +102,10 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
       },
     });
 
+    // CRITICAL: Access .text property directly (do not call as a method)
     const text = response.text;
     if (!text) throw new Error("AIから空のレスポンスが返されました。");
-
+    
     const parsed = JSON.parse(text.trim());
     return (parsed.stamps || []).map((s: any) => ({
       ...s,
