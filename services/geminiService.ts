@@ -40,8 +40,9 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
     return MOCK_DATA;
   }
 
-  const key = import.meta.env?.VITE_GEMINI_API_KEY || process.env?.API_KEY;
-  const ai = new GoogleGenAI({ apiKey: key as string });
+  // Fix: Strictly follow the mandatory hybrid environment variable access format as requested.
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? (process as any).env?.VITE_GEMINI_API_KEY : '');
+  const ai = new GoogleGenAI({ apiKey });
 
   console.log("Gemini API: 解析開始...");
   
@@ -102,7 +103,7 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
       },
     });
 
-    // Fix: Access the .text property directly as per @google/genai guidelines
+    // Fix: Always access the .text property directly (do not call as a method)
     const text = response.text;
     if (!text) throw new Error("AIから空のレスポンスが返されました。");
     

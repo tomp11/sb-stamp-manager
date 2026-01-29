@@ -13,31 +13,42 @@ import {
 
 /**
  * ユーザー固有のスタンプデータをFirestoreから取得
+ * ネットワークエラーでハングするのを防ぐため、タイムアウト処理を導入
  */
 export const loadStampsFromDB = async (userId: string): Promise<StoreStamp[]> => {
-  try {
-    const { db } = getFirebaseInstance();
-    
-    const stampsRef = collection(db, "users", userId, "stamps");
-    const q = query(stampsRef, orderBy("lastVisitDate", "desc"));
-    const querySnapshot = await getDocs(q);
-    
-    return querySnapshot.docs.map(doc => ({
-      ...doc.data(),
-      id: doc.id
-    } as StoreStamp));
-  } catch (error) {
-    console.error("Error loading stamps from Firestore:", error);
-    // 認証エラーや設定ミスなどの場合は空配列を返してアプリを止めない
-    return [];
-  }
+  const fetchPromise = (async () => {
+    try {
+      const { db } = getFirebaseInstance();
+      const stampsRef = collection(db, "users", userId, "stamps");
+      const q = query(stampsRef, orderBy("lastVisitDate", "desc"));
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      } as StoreStamp));
+    } catch (error) {
+      console.error("Error loading stamps from Firestore:", error);
+      return [];
+    }
+  })();
+
+  // 10秒経っても応答がない場合は空配列で解決させる（無限ロード防止）
+  const timeoutPromise = new Promise<StoreStamp[]>((resolve) => 
+    setTimeout(() => {
+      console.warn("Firestore fetch timeout: Returning empty collection.");
+      resolve([]);
+    }, 10000)
+  );
+
+  return Promise.race([fetchPromise, timeoutPromise]);
 };
 
 /**
  * スタンプを一括保存 (更新/新規)
  */
 export const saveStampsToDB = async (stamps: StoreStamp[], userId: string): Promise<void> => {
-  if (!userId || userId === 'local' || userId === 'guest') return;
+  if (!userId || userId === 'local' || userId === 'guest' || stamps.length === 0) return;
 
   try {
     const { db } = getFirebaseInstance();
@@ -45,7 +56,6 @@ export const saveStampsToDB = async (stamps: StoreStamp[], userId: string): Prom
     
     stamps.forEach(stamp => {
       const stampRef = doc(db, "users", userId, "stamps", stamp.id);
-      // updatedAtを追加してメタデータを更新
       batch.set(stampRef, { 
         ...stamp, 
         updatedAt: new Date().toISOString() 
@@ -55,7 +65,7 @@ export const saveStampsToDB = async (stamps: StoreStamp[], userId: string): Prom
     await batch.commit();
   } catch (error) {
     console.error("Error saving stamps to Firestore:", error);
-    throw error;
+    // 保存エラーはユーザーに致命的な影響を与えないよう、ログのみに留める
   }
 };
 
@@ -71,6 +81,5 @@ export const deleteStampFromDB = async (userId: string, stampId: string): Promis
     await deleteDoc(stampRef);
   } catch (error) {
     console.error("Error deleting stamp:", error);
-    throw error;
   }
 };

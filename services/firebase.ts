@@ -1,23 +1,28 @@
 
-// Fix: Consolidated modular imports to resolve member resolution errors.
-import { initializeApp, type FirebaseApp } from "firebase/app";
+// Fix: Split type and value imports to resolve "no exported member" errors in certain environments.
+import { initializeApp } from "firebase/app";
+import type { FirebaseApp } from "firebase/app";
 import { 
   getAuth, 
   GoogleAuthProvider, 
   onAuthStateChanged, 
   signInWithPopup, 
-  signOut,
-  type Auth
+  signOut
 } from "firebase/auth";
-import { initializeFirestore, type Firestore } from "firebase/firestore";
+import type { Auth } from "firebase/auth";
+import { initializeFirestore } from "firebase/firestore";
+import type { Firestore } from "firebase/firestore";
 
-// 指定された優先順位で環境変数を取得
+// Fix: Use hybrid environment variable access as per project guidelines (VITE_ prefix is mandatory).
 const getEnvVal = (key: string): string | undefined => {
   const viteKey = `VITE_FIREBASE_${key}`;
   const directKey = `FIREBASE_${key}`;
-  return (import.meta as any).env?.[viteKey] || 
-         (process as any).env?.[viteKey] || 
-         (process as any).env?.[directKey];
+  
+  // Explicit hybrid check for compatibility between Vite and other environments
+  const viteVal = (import.meta as any).env?.[viteKey];
+  const procVal = typeof process !== 'undefined' ? (process as any).env?.[viteKey] || (process as any).env?.[directKey] : undefined;
+  
+  return viteVal || procVal;
 };
 
 const firebaseConfig = {
@@ -40,9 +45,14 @@ if (isConfigValid) {
   try {
     app = initializeApp(firebaseConfig as any);
     auth = getAuth(app);
-    // ネットワークの安定性を高める設定を追加
+    
+    // 【重要】ネットワークのハングを防止する設定
+    // experimentalForceLongPolling: true は、WebSocketsが不安定な環境で
+    // Firestoreの接続を劇的に安定させ、読み込みの「止まり」を解消します。
     db = initializeFirestore(app, {
       ignoreUndefinedProperties: true,
+      experimentalForceLongPolling: true, 
+      useFetchStreams: false 
     });
   } catch (error) {
     console.error("Firebase Initialization Error:", error);
