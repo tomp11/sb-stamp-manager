@@ -1,18 +1,17 @@
-// Fix: Use separate import statements for values and types to resolve export member errors
-import { initializeApp } from "firebase/app";
-import type { FirebaseApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import type { Auth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import type { Firestore } from "firebase/firestore";
 
+// Fix: Use consolidated import statements to resolve "no exported member" errors in modular Firebase SDK
+import { initializeApp, type FirebaseApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, type Auth } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
+
+// Safely access env variables using optional chaining to prevent "Cannot read properties of undefined"
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: import.meta.env?.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env?.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env?.VITE_FIREBASE_APP_ID
 };
 
 // インスタンスの初期化
@@ -32,11 +31,12 @@ if (isConfigValid) {
   } catch (error) {
     console.error("Firebase Initialization Error:", error);
   }
+} else {
+  console.warn("Firebase configuration is missing or incomplete. Some features like Cloud Sync will be unavailable.");
 }
 
 /**
  * Firebaseインスタンスを即座に取得するための関数
- * すでに初期化済みの場合は即座に返し、未初期化の場合はエラーを投げるかnullを返す
  */
 export const getFirebaseInstance = () => {
   if (!isConfigValid) throw new Error("Firebase configuration is missing.");
@@ -44,7 +44,7 @@ export const getFirebaseInstance = () => {
   return { auth, db, googleProvider };
 };
 
-// 互換性のための initFirebase (非同期を維持しつつ内部で同期取得)
+// 互換性のための initFirebase
 export const initFirebase = async () => getFirebaseInstance();
 
 // 各種Authメソッドと型を再エクスポート
