@@ -40,12 +40,12 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
     return MOCK_DATA;
   }
 
-  // Fix: Strictly follow the mandatory hybrid environment variable access format as requested.
   const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? (process as any).env?.VITE_GEMINI_API_KEY : '');
-  const ai = new GoogleGenAI({ apiKey });
+  console.log(apiKey)
+  const ai = new GoogleGenAI({ apiKey: apiKey });
 
   console.log("Gemini API: 解析開始...");
-  
+
   // Fix: Move static extraction rules to systemInstruction for better model control.
   const systemInstruction = `
     あなたはスターバックスの「マイストアパスポート」のスタンプ画像を解析する専門家です。
@@ -109,7 +109,7 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
     // Fix: Access the .text property directly (do not call as a method) as per Google GenAI SDK rules.
     const text = response.text;
     if (!text) throw new Error("AIから空のレスポンスが返されました。");
-    
+
     const parsed = JSON.parse(text.trim());
     return (parsed.stamps || []).map((s: any) => ({
       ...s,

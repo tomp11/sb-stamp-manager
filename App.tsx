@@ -34,34 +34,34 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetError
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [authLoading, setAuthLoading] = useState(false); 
+  const [authLoading, setAuthLoading] = useState(false);
   const { stamps, isLoading: stampsLoading, isSyncing, addStamps, deleteStamp } = useStamps(user?.id || null);
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const [globalError, setGlobalError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // 起動時の初期化
-    const monitorAuth = async () => {
-      try {
-        const { auth } = await initFirebase();
-        onAuthStateChanged(auth, (firebaseUser) => {
-          if (firebaseUser) {
-            setUser({
-              id: firebaseUser.uid,
-              name: firebaseUser.displayName || 'User',
-              email: firebaseUser.email || '',
-              picture: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Starbucks'
-            });
-          } else {
-            setUser(null);
-          }
-        });
-      } catch (e) {
-        console.error("Auth initialization error:", e);
-      }
-    };
-    monitorAuth();
-  }, []);
+  // useEffect(() => {
+  //   // 起動時の初期化
+  //   const monitorAuth = async () => {
+  //     try {
+  //       const { auth } = await initFirebase();
+  //       onAuthStateChanged(auth, (firebaseUser) => {
+  //         if (firebaseUser) {
+  //           setUser({
+  //             id: firebaseUser.uid,
+  //             name: firebaseUser.displayName || 'User',
+  //             email: firebaseUser.email || '',
+  //             picture: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Starbucks'
+  //           });
+  //         } else {
+  //           setUser(null);
+  //         }
+  //       });
+  //     } catch (e) {
+  //       console.error("Auth initialization error:", e);
+  //     }
+  //   };
+  //   monitorAuth();
+  // }, []);
 
   const handleLogin = async () => {
     setAuthLoading(true);
@@ -92,18 +92,18 @@ const App: React.FC = () => {
   // ローディング画面の条件を「本当に何も表示できない時」に限定
   const showFullLoading = authLoading || (user && stampsLoading && stamps.length === 0);
 
-  if (showFullLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-[#00704A] animate-spin mx-auto mb-4" />
-          <p className="text-gray-500 font-medium animate-pulse">
-            {authLoading ? '認証中...' : 'コレクションを同期中...'}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // if (showFullLoading) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center bg-gray-50">
+  //       <div className="text-center">
+  //         <Loader2 className="w-12 h-12 text-[#00704A] animate-spin mx-auto mb-4" />
+  //         <p className="text-gray-500 font-medium animate-pulse">
+  //           {authLoading ? '認証中...' : 'コレクションを同期中...'}
+  //         </p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => window.location.reload()}>
@@ -132,14 +132,14 @@ const App: React.FC = () => {
                 <h1 className="text-lg font-bold tracking-tight">Stamp Master</h1>
               </div>
               <nav className="flex items-center bg-black/10 rounded-full p-1 ml-2">
-                <button 
+                <button
                   onClick={() => setActiveTab('list')}
                   className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === 'list' ? 'bg-white text-[#00704A] shadow-sm' : 'text-white/80 hover:text-white'}`}
                 >
                   <List className="w-3.5 h-3.5" />
                   リスト
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveTab('map')}
                   className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === 'map' ? 'bg-white text-[#00704A] shadow-sm' : 'text-white/80 hover:text-white'}`}
                 >
@@ -148,7 +148,7 @@ const App: React.FC = () => {
                 </button>
               </nav>
             </div>
-            
+
             <div className="flex items-center gap-3">
               {user && (
                 <div className="flex items-center gap-1.5 text-[10px] bg-white/10 px-2.5 py-1 rounded-full font-bold">
@@ -159,25 +159,25 @@ const App: React.FC = () => {
 
               {user ? (
                 <div className="flex items-center gap-3 pl-3 border-l border-white/20 group relative">
-                   <div className="text-right hidden sm:block">
-                      <p className="text-[10px] text-emerald-100 font-bold leading-none">Cloud Connected</p>
-                      <p className="text-xs font-bold leading-tight truncate max-w-[100px]">{user?.name}</p>
-                   </div>
-                   <img 
-                    src={user?.picture} 
-                    alt={user?.name} 
+                  <div className="text-right hidden sm:block">
+                    <p className="text-[10px] text-emerald-100 font-bold leading-none">Cloud Connected</p>
+                    <p className="text-xs font-bold leading-tight truncate max-w-[100px]">{user?.name}</p>
+                  </div>
+                  <img
+                    src={user?.picture}
+                    alt={user?.name}
                     className="w-9 h-9 rounded-full border border-white/30 cursor-pointer"
-                   />
-                   <button 
-                      onClick={handleLogout}
-                      className="absolute top-11 right-0 bg-white text-gray-800 px-4 py-2 rounded-xl text-xs font-bold shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all flex items-center gap-2 border border-gray-100 whitespace-nowrap"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      ログアウト
-                    </button>
+                  />
+                  <button
+                    onClick={handleLogout}
+                    className="absolute top-11 right-0 bg-white text-gray-800 px-4 py-2 rounded-xl text-xs font-bold shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all flex items-center gap-2 border border-gray-100 whitespace-nowrap"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    ログアウト
+                  </button>
                 </div>
               ) : (
-                <button 
+                <button
                   onClick={handleLogin}
                   className="flex items-center gap-2 px-4 py-2 bg-white text-[#00704A] hover:bg-emerald-50 rounded-full text-xs font-bold transition-all shadow-md"
                 >
@@ -221,8 +221,8 @@ const App: React.FC = () => {
             <div className="lg:col-span-8 min-h-[400px]">
               <Suspense fallback={
                 <div className="w-full h-[500px] flex flex-col items-center justify-center bg-white rounded-2xl border border-dashed border-gray-200">
-                   <Loader2 className="w-10 h-10 text-emerald-200 animate-spin mb-4" />
-                   <p className="text-gray-400 text-sm font-medium">コンポーネントを読込中...</p>
+                  <Loader2 className="w-10 h-10 text-emerald-200 animate-spin mb-4" />
+                  <p className="text-gray-400 text-sm font-medium">コンポーネントを読込中...</p>
                 </div>
               }>
                 {activeTab === 'list' ? (
