@@ -1,28 +1,26 @@
 
-// Fix: Split type and value imports to resolve "no exported member" errors in certain environments.
-import { initializeApp } from "firebase/app";
-import type { FirebaseApp } from "firebase/app";
+// Fix: Consolidated imports and using standard modular syntax to resolve "no exported member" issues.
+import { initializeApp, FirebaseApp } from "firebase/app";
 import { 
   getAuth, 
   GoogleAuthProvider, 
   onAuthStateChanged, 
   signInWithPopup, 
-  signOut
+  signOut,
+  Auth
 } from "firebase/auth";
-import type { Auth } from "firebase/auth";
-import { initializeFirestore } from "firebase/firestore";
-import type { Firestore } from "firebase/firestore";
+import { initializeFirestore, Firestore } from "firebase/firestore";
 
-// Fix: Use hybrid environment variable access as per project guidelines (VITE_ prefix is mandatory).
+// Fix: Use mandatory hybrid environment variable access format as per project guidelines.
 const getEnvVal = (key: string): string | undefined => {
   const viteKey = `VITE_FIREBASE_${key}`;
-  const directKey = `FIREBASE_${key}`;
   
   // Explicit hybrid check for compatibility between Vite and other environments
-  const viteVal = (import.meta as any).env?.[viteKey];
-  const procVal = typeof process !== 'undefined' ? (process as any).env?.[viteKey] || (process as any).env?.[directKey] : undefined;
+  const val = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[viteKey]) || 
+              (typeof process !== 'undefined' && process.env && process.env[viteKey]) || 
+              undefined;
   
-  return viteVal || procVal;
+  return val;
 };
 
 const firebaseConfig = {

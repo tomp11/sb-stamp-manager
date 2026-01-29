@@ -34,10 +34,11 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetError
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
+  // 初期ロード中の authLoading を false にし、認証を待たずにゲストモードで開始
+  const [authLoading, setAuthLoading] = useState(false); 
   const { stamps, isLoading: stampsLoading, isSyncing, addStamps, deleteStamp } = useStamps(user?.id || null);
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const [globalError, setGlobalError] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     const monitorAuth = async () => {
@@ -54,22 +55,23 @@ const App: React.FC = () => {
           } else {
             setUser(null);
           }
-          setAuthLoading(false);
         });
       } catch (e) {
         console.error("Auth initialization error:", e);
-        setAuthLoading(false);
       }
     };
     monitorAuth();
   }, []);
 
   const handleLogin = async () => {
+    setAuthLoading(true);
     try {
       const { auth, googleProvider } = await initFirebase();
       await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
       setGlobalError(error?.message || "ログインに失敗しました。");
+    } finally {
+      setAuthLoading(false);
     }
   };
 
@@ -87,13 +89,14 @@ const App: React.FC = () => {
   const storeCount = new Set(stamps?.map(s => s?.storeName)).size;
   const prefCount = new Set(stamps?.map(s => s?.prefecture)).size;
 
+  // 起動時の認証待機を排除し、ログイン済みのユーザーデータを取得しているときだけローディングを表示
   if (authLoading || (user && stampsLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-[#00704A] animate-spin mx-auto mb-4" />
           <p className="text-gray-500 font-medium animate-pulse">
-            {authLoading ? 'アカウントを確認中...' : 'コレクションを読み込み中...'}
+            {authLoading ? '認証中...' : 'コレクションを読み込み中...'}
           </p>
         </div>
       </div>

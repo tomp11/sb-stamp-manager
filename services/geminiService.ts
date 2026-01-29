@@ -103,7 +103,7 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
       },
     });
 
-    // Fix: Always access the .text property directly (do not call as a method)
+    // Fix: Access the .text property directly (do not call as a method) as per Google GenAI SDK rules.
     const text = response.text;
     if (!text) throw new Error("AIから空のレスポンスが返されました。");
     
