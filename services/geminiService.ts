@@ -39,20 +39,12 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
     return MOCK_DATA;
   }
 
-  // APIキーの取得（シムによってセットされた process.env.API_KEY を使用）
-  const apiKey = process.env.API_KEY;
-  
-  if (!apiKey || apiKey.includes('あなたの')) {
-    throw new Error(
-      "Gemini APIキーが設定されていません。.env ファイルの VITE_GEMINI_API_KEY に有効なキーを入力してください。"
-    );
-  }
-
-  // 規約に基づき GoogleGenAI インスタンスを生成
-  const ai = new GoogleGenAI({ apiKey });
+  // Fix: Always use process.env.API_KEY directly when initializing the GoogleGenAI client instance.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   console.log("Gemini API: 解析開始...");
-  const model = 'gemini-3-flash-preview';
+  // Fix: Select gemini-3-pro-preview for complex reasoning and data extraction tasks.
+  const model = 'gemini-3-pro-preview';
   
   const prompt = `
     You are an OCR engine for Starbucks Japan "My Store Passport".
@@ -77,11 +69,13 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
   };
 
   try {
+    // Fix: Call generateContent with model and contents as per guidelines.
     const response = await ai.models.generateContent({
       model,
       contents: { parts: [imagePart, { text: prompt }] },
       config: {
-        thinkingConfig: { thinkingBudget: 512 },
+        // Fix: Use thinkingConfig for Gemini 3 models to improve extraction accuracy.
+        thinkingConfig: { thinkingBudget: 2048 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -108,6 +102,7 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
       },
     });
 
+    // Fix: Access response text via property, not method.
     const text = response.text;
     if (!text) throw new Error("AIから空のレスポンスが返されました。");
     

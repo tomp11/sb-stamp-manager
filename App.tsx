@@ -1,14 +1,37 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { StoreStamp, UserProfile } from './types';
 import Uploader from './components/Uploader';
 import StoreList from './components/StoreList';
-import StoreMap from './components/StoreMap';
-import ErrorBoundary from './components/ErrorBoundary';
+import { ErrorBoundary } from 'react-error-boundary';
 import { useStamps } from './hooks/useStamps';
-// Import initialized auth functions from our firebase service to ensure consistency
 import { initFirebase, onAuthStateChanged, signInWithPopup, signOut } from './services/firebase';
-import { Coffee, List, Map, Trophy, AlertCircle, X, Loader2, LogIn, LogOut, Cloud, CheckCircle2 } from 'lucide-react';
+import { Coffee, List, Map, Trophy, AlertCircle, X, Loader2, LogIn, LogOut, Cloud, CheckCircle2, RefreshCw } from 'lucide-react';
+
+// Lazy load the map component to reduce initial bundle size and allow Suspense to work
+const StoreMap = lazy(() => import('./components/StoreMap'));
+
+const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-red-100 p-8 text-center">
+      <div className="inline-flex items-center justify-center w-16 h-16 bg-red-50 rounded-full mb-6">
+        <AlertCircle className="w-8 h-8 text-red-500" />
+      </div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">エラーが発生しました</h1>
+      <p className="text-gray-500 mb-6">アプリの実行中に予期せぬエラーが発生しました。</p>
+      <div className="bg-red-50 rounded-xl p-4 mb-8 text-left overflow-auto max-h-40">
+        <p className="text-xs font-mono text-red-700 break-all">{error?.message || "不明なエラー"}</p>
+      </div>
+      <button
+        onClick={resetErrorBoundary}
+        className="flex items-center justify-center gap-2 w-full py-3 bg-[#00704A] text-white rounded-xl font-bold hover:bg-[#005c3d] transition-colors"
+      >
+        <RefreshCw className="w-4 h-4" />
+        再読み込みして復旧
+      </button>
+    </div>
+  </div>
+);
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -17,13 +40,10 @@ const App: React.FC = () => {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // 起動時のAuth監視（環境変数があれば）
   useEffect(() => {
     const monitorAuth = async () => {
       try {
         const { auth } = await initFirebase();
-        
-        // Use the imported onAuthStateChanged which is properly resolved
         onAuthStateChanged(auth, (firebaseUser) => {
           if (firebaseUser) {
             const profile = {
@@ -33,7 +53,6 @@ const App: React.FC = () => {
               picture: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Starbucks'
             };
             setUser(profile);
-            // ログイン成功時にマイグレーション
             migrateLocalToCloud(firebaseUser.uid);
           } else {
             setUser(null);
@@ -41,21 +60,17 @@ const App: React.FC = () => {
           setAuthLoading(false);
         });
       } catch (e) {
-        // 環境変数がない場合は監視をスキップ（ゲストモード固定）
         setAuthLoading(false);
       }
     };
-
     monitorAuth();
   }, [migrateLocalToCloud]);
 
   const handleLogin = async () => {
     try {
       const { auth, googleProvider } = await initFirebase();
-      
-      // Use the imported signInWithPopup which is properly resolved
       const result = await signInWithPopup(auth, googleProvider);
-      if (result.user) {
+      if (result?.user) {
         const profile = {
           id: result.user.uid,
           name: result.user.displayName || 'User',
@@ -66,7 +81,7 @@ const App: React.FC = () => {
         await migrateLocalToCloud(result.user.uid);
       }
     } catch (error: any) {
-      setGlobalError(error.message || "ログインに失敗しました。ゲストモードで継続できます。");
+      setGlobalError(error?.message || "ログインに失敗しました。ゲストモードで継続できます。");
     }
   };
 
@@ -74,7 +89,6 @@ const App: React.FC = () => {
     if (!confirm('ログアウトしますか？')) return;
     try {
       const { auth } = await initFirebase();
-      // Use the imported signOut which is properly resolved
       await signOut(auth);
       setUser(null);
     } catch (error) {
@@ -82,8 +96,8 @@ const App: React.FC = () => {
     }
   };
 
-  const storeCount = new Set(stamps.map(s => s.storeName)).size;
-  const prefCount = new Set(stamps.map(s => s.prefecture)).size;
+  const storeCount = new Set(stamps?.map(s => s?.storeName)).size;
+  const prefCount = new Set(stamps?.map(s => s?.prefecture)).size;
 
   if (stampsLoading || authLoading) {
     return (
@@ -97,7 +111,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => window.location.reload()}>
       <div className="min-h-screen bg-[#f3f4f6] pb-24 font-sans">
         {globalError && (
           <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-xl animate-in slide-in-from-top-4">
@@ -120,9 +134,7 @@ const App: React.FC = () => {
                 <div className="bg-white p-1.5 rounded-full shadow-inner">
                   <Coffee className="w-5 h-5 text-[#00704A]" />
                 </div>
-                <h1 className="text-lg font-bold tracking-tight">
-                  Stamp Master
-                </h1>
+                <h1 className="text-lg font-bold tracking-tight">Stamp Master</h1>
               </div>
               <nav className="flex items-center bg-black/10 rounded-full p-1 ml-2">
                 <button 
@@ -154,11 +166,11 @@ const App: React.FC = () => {
                 <div className="flex items-center gap-3 pl-3 border-l border-white/20 group relative">
                    <div className="text-right hidden sm:block">
                       <p className="text-[10px] text-emerald-100 font-bold leading-none">Cloud Connected</p>
-                      <p className="text-xs font-bold leading-tight truncate max-w-[100px]">{user.name}</p>
+                      <p className="text-xs font-bold leading-tight truncate max-w-[100px]">{user?.name}</p>
                    </div>
                    <img 
-                    src={user.picture} 
-                    alt={user.name} 
+                    src={user?.picture} 
+                    alt={user?.name} 
                     className="w-9 h-9 rounded-full border border-white/30 cursor-pointer"
                    />
                    <button 
@@ -212,19 +224,26 @@ const App: React.FC = () => {
             </div>
 
             <div className="lg:col-span-8">
-              {activeTab === 'list' ? (
-                <StoreList stamps={stamps} onDelete={deleteStamp} />
-              ) : (
-                <div className="space-y-4">
-                  <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
-                    <h3 className="font-bold text-gray-700 flex items-center gap-2 px-2">
-                      <div className="w-2 h-2 rounded-full bg-[#00704A]" />
-                      店舗分布マップ
-                    </h3>
-                  </div>
-                  <StoreMap stamps={stamps} />
+              <Suspense fallback={
+                <div className="w-full h-[500px] flex flex-col items-center justify-center bg-white rounded-2xl border border-dashed border-gray-200">
+                   <Loader2 className="w-10 h-10 text-emerald-200 animate-spin mb-4" />
+                   <p className="text-gray-400 text-sm font-medium">コンポーネントを読込中...</p>
                 </div>
-              )}
+              }>
+                {activeTab === 'list' ? (
+                  <StoreList stamps={stamps || []} onDelete={deleteStamp} />
+                ) : (
+                  <div className="space-y-4">
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
+                      <h3 className="font-bold text-gray-700 flex items-center gap-2 px-2">
+                        <div className="w-2 h-2 rounded-full bg-[#00704A]" />
+                        店舗分布マップ
+                      </h3>
+                    </div>
+                    <StoreMap stamps={stamps || []} />
+                  </div>
+                )}
+              </Suspense>
             </div>
           </div>
         </main>

@@ -1,7 +1,7 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { StoreStamp } from '../types';
-import { loadStampsFromDB, saveStampsToDB } from '../services/storageService';
+import { loadStampsFromDB, saveStampsToDB, deleteStampFromDB } from '../services/storageService';
 
 const STORAGE_KEY = 'my_store_passports';
 
@@ -9,19 +9,16 @@ export const useStamps = (userId: string | null) => {
   const [stamps, setStamps] = useState<StoreStamp[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const isInitialLoad = useRef(true);
 
-  // 初回読み込みとモード切り替え時の処理
+  // 初回読み込み
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       if (userId) {
         // クラウドモード
-        try {
-          const cloudData = await loadStampsFromDB(userId);
-          setStamps(cloudData);
-        } catch (e) {
-          console.error("Cloud load error:", e);
-        }
+        const cloudData = await loadStampsFromDB(userId);
+        setStamps(cloudData);
       } else {
         // ゲストモード（LocalStorage）
         const saved = localStorage.getItem(STORAGE_KEY);
@@ -35,39 +32,18 @@ export const useStamps = (userId: string | null) => {
         }
       }
       setIsLoading(false);
+      isInitialLoad.current = false;
     };
 
     loadData();
   }, [userId]);
 
-  // ログイン時のマイグレーション（1回限り）
-  const migrateLocalToCloud = useCallback(async (newUserId: string) => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return;
-
-    try {
-      const localStamps: StoreStamp[] = JSON.parse(saved);
-      if (localStamps.length > 0) {
-        console.log("Migrating local stamps to cloud...");
-        await saveStampsToDB(localStamps, newUserId);
-        // 移行が成功したらローカルをクリア
-        localStorage.removeItem(STORAGE_KEY);
-        // 最新のクラウドデータを取得
-        const mergedData = await loadStampsFromDB(newUserId);
-        setStamps(mergedData);
-      }
-    } catch (e) {
-      console.error("Migration error:", e);
-    }
-  }, []);
-
-  // データ変更時の保存処理
+  // データ変更時の保存処理（同期）
   useEffect(() => {
-    if (isLoading) return;
+    // 初回読み込み完了前は保存しない
+    if (isLoading || isInitialLoad.current) return;
 
     if (userId) {
-      // クラウド保存は明示的な追加・削除時にstorageService経由で行うため
-      // ここでは自動保存（debounce）的な役割
       const sync = async () => {
         setIsSyncing(true);
         try {
@@ -78,20 +54,42 @@ export const useStamps = (userId: string | null) => {
           setIsSyncing(false);
         }
       };
-      const timer = setTimeout(sync, 2000);
+      // デバウンスを少し短縮して体感速度を向上
+      const timer = setTimeout(sync, 1000);
       return () => clearTimeout(timer);
     } else {
-      // ゲストモード保存
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stamps));
     }
   }, [stamps, userId, isLoading]);
+
+  // ログイン時のマイグレーション
+  const migrateLocalToCloud = useCallback(async (newUserId: string) => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+
+    try {
+      const localStamps: StoreStamp[] = JSON.parse(saved);
+      if (localStamps.length > 0) {
+        setIsSyncing(true);
+        await saveStampsToDB(localStamps, newUserId);
+        localStorage.removeItem(STORAGE_KEY);
+        const mergedData = await loadStampsFromDB(newUserId);
+        setStamps(mergedData);
+        setIsSyncing(false);
+      }
+    } catch (e) {
+      console.error("Migration error:", e);
+      setIsSyncing(false);
+    }
+  }, []);
 
   const addStamps = useCallback((newStamps: StoreStamp[]) => {
     let added = 0;
     let updated = 0;
     let skipped = 0;
 
-    const normalizeName = (name: string) => name.trim().normalize('NFKC').replace(/\s+/g, '').replace(/[（(]/g, '(').replace(/[）)]/g, ')');
+    const normalizeName = (name: string) => 
+      name.trim().normalize('NFKC').replace(/\s+/g, '').replace(/[（(]/g, '(').replace(/[）)]/g, ')');
 
     setStamps(prev => {
       const updatedList = [...prev];
@@ -132,7 +130,11 @@ export const useStamps = (userId: string | null) => {
 
   const deleteStamp = useCallback((id: string) => {
     setStamps(prev => prev.filter(s => s.id !== id));
-  }, []);
+    // Firestoreからも即座に削除
+    if (userId) {
+      deleteStampFromDB(userId, id).catch(console.error);
+    }
+  }, [userId]);
 
   return { stamps, isLoading, isSyncing, addStamps, deleteStamp, migrateLocalToCloud };
 };

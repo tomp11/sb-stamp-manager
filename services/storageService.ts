@@ -1,14 +1,22 @@
 
-import { initFirebase } from './firebase';
+import { getFirebaseInstance } from './firebase';
 import { StoreStamp } from '../types';
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  orderBy, 
+  doc, 
+  writeBatch, 
+  deleteDoc 
+} from "firebase/firestore";
 
 /**
  * ユーザー固有のスタンプデータをFirestoreから取得
  */
 export const loadStampsFromDB = async (userId: string): Promise<StoreStamp[]> => {
   try {
-    const { db } = await initFirebase();
-    const { collection, getDocs, query, orderBy } = await import("firebase/firestore");
+    const { db } = getFirebaseInstance();
     
     const stampsRef = collection(db, "users", userId, "stamps");
     const q = query(stampsRef, orderBy("lastVisitDate", "desc"));
@@ -20,31 +28,34 @@ export const loadStampsFromDB = async (userId: string): Promise<StoreStamp[]> =>
     } as StoreStamp));
   } catch (error) {
     console.error("Error loading stamps from Firestore:", error);
-    throw new Error("データの読み込みに失敗しました。");
+    // 認証エラーや設定ミスなどの場合は空配列を返してアプリを止めない
+    return [];
   }
 };
 
 /**
- * スタンプを一括保存
+ * スタンプを一括保存 (更新/新規)
  */
 export const saveStampsToDB = async (stamps: StoreStamp[], userId: string): Promise<void> => {
   if (!userId || userId === 'local' || userId === 'guest') return;
 
   try {
-    const { db } = await initFirebase();
-    const { doc, writeBatch } = await import("firebase/firestore");
-    
+    const { db } = getFirebaseInstance();
     const batch = writeBatch(db);
     
     stamps.forEach(stamp => {
       const stampRef = doc(db, "users", userId, "stamps", stamp.id);
-      batch.set(stampRef, { ...stamp, updatedAt: new Date().toISOString() }, { merge: true });
+      // updatedAtを追加してメタデータを更新
+      batch.set(stampRef, { 
+        ...stamp, 
+        updatedAt: new Date().toISOString() 
+      }, { merge: true });
     });
 
     await batch.commit();
   } catch (error) {
     console.error("Error saving stamps to Firestore:", error);
-    throw new Error("データの保存に失敗しました。");
+    throw error;
   }
 };
 
@@ -52,14 +63,14 @@ export const saveStampsToDB = async (stamps: StoreStamp[], userId: string): Prom
  * 単一のスタンプを削除
  */
 export const deleteStampFromDB = async (userId: string, stampId: string): Promise<void> => {
+  if (!userId || userId === 'local' || userId === 'guest') return;
+
   try {
-    const { db } = await initFirebase();
-    const { doc, deleteDoc } = await import("firebase/firestore");
-    
+    const { db } = getFirebaseInstance();
     const stampRef = doc(db, "users", userId, "stamps", stampId);
     await deleteDoc(stampRef);
   } catch (error) {
     console.error("Error deleting stamp:", error);
-    throw new Error("スタンプの削除に失敗しました。");
+    throw error;
   }
 };

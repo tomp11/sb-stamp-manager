@@ -16,7 +16,6 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
   const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
   const [isLocating, setIsLocating] = useState(false);
 
-  // 地図のサイズを再計算させる（空白対策）
   const fixMapSize = useCallback(() => {
     if (mapRef.current) {
       setTimeout(() => {
@@ -25,14 +24,12 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
     }
   }, []);
 
-  // 現在地へジャンプする関数
   const handleRecenter = useCallback(() => {
     if (mapRef.current && userCoords) {
       mapRef.current.setView(userCoords, 14, { animate: true });
     }
   }, [userCoords]);
 
-  // 全スタンプを表示範囲に収める関数
   const handleFitAll = useCallback(() => {
     if (mapRef.current && markersRef.current.length > 0) {
       const group = L.featureGroup(markersRef.current);
@@ -46,7 +43,7 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
     if (!mapRef.current) {
       try {
         mapRef.current = L.map(mapContainerRef.current, {
-          center: [35.6812, 139.7671], // デフォルト東京駅
+          center: [35.6812, 139.7671],
           zoom: 13,
           scrollWheelZoom: true,
           zoomControl: false 
@@ -58,7 +55,6 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(mapRef.current);
 
-        // 初回描画の安定化
         fixMapSize();
       } catch (e) {
         console.error("Leaflet init error:", e);
@@ -66,51 +62,48 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
       }
     }
 
-    // 既存のマーカーをクリア
-    markersRef.current.forEach(m => m.remove());
+    markersRef.current.forEach(m => m?.remove());
     markersRef.current = [];
     if (userLocationMarkerRef.current) {
       userLocationMarkerRef.current.remove();
       userLocationMarkerRef.current = null;
     }
 
-    const validStamps = stamps.filter(s => 
+    const validStamps = (stamps || []).filter(s => 
       s && 
-      typeof s.latitude === 'number' && 
-      typeof s.longitude === 'number' && 
-      !isNaN(s.latitude) && 
-      !isNaN(s.longitude)
+      typeof s?.latitude === 'number' && 
+      typeof s?.longitude === 'number' && 
+      !isNaN(s?.latitude) && 
+      !isNaN(s?.longitude)
     );
 
-    // スタンプマーカーの追加
     validStamps.forEach(stamp => {
       try {
-        const visitCountStr = stamp.visitCount !== undefined ? `${stamp.visitCount}回` : '未確認';
-        const visitDateStr = stamp.lastVisitDate || '未取得';
+        const visitCountStr = stamp?.visitCount !== undefined ? `${stamp?.visitCount}回` : '未確認';
+        const visitDateStr = stamp?.lastVisitDate || '未取得';
         
-        const marker = L.marker([stamp.latitude!, stamp.longitude!])
+        const marker = L.marker([stamp?.latitude!, stamp?.longitude!])
           .bindPopup(`
             <div style="min-width: 180px; padding: 4px;">
-              <div style="font-weight: bold; color: #00704A; font-size: 15px; margin-bottom: 2px;">${stamp.storeName}</div>
-              <div style="font-size: 11px; color: #666; margin-bottom: 8px; line-height: 1.4;">${stamp.address}</div>
+              <div style="font-weight: bold; color: #00704A; font-size: 15px; margin-bottom: 2px;">${stamp?.storeName}</div>
+              <div style="font-size: 11px; color: #666; margin-bottom: 8px; line-height: 1.4;">${stamp?.address}</div>
               <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 6px; font-size: 12px;">
                 <span style="color: #999;">訪問回数</span>
-                <span style="font-weight: bold; color: ${stamp.visitCount !== undefined ? '#333' : '#ccc'};">${visitCountStr}</span>
+                <span style="font-weight: bold; color: ${stamp?.visitCount !== undefined ? '#333' : '#ccc'};">${visitCountStr}</span>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 11px;">
                 <span style="color: #999;">最終訪問</span>
-                <span style="color: ${stamp.lastVisitDate ? '#333' : '#ccc'};">${visitDateStr}</span>
+                <span style="color: ${stamp?.lastVisitDate ? '#333' : '#ccc'};">${visitDateStr}</span>
               </div>
             </div>
           `)
           .addTo(mapRef.current!);
         markersRef.current.push(marker);
       } catch (e) {
-        console.warn("Marker creation failed for:", stamp.storeName, e);
+        console.warn("Marker creation failed for:", stamp?.storeName, e);
       }
     });
 
-    // 現在地の取得
     if (navigator.geolocation) {
       setIsLocating(true);
       navigator.geolocation.getCurrentPosition(
@@ -120,7 +113,6 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
           setUserCoords(coords);
 
           if (mapRef.current) {
-            // 現在地マーカー
             userLocationMarkerRef.current = L.circle(coords, {
               radius: 100,
               color: '#00704A',
@@ -129,14 +121,12 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
               weight: 3
             }).addTo(mapRef.current).bindPopup("現在地");
 
-            // マップサイズを再計算してから移動
             fixMapSize();
             mapRef.current.setView(coords, 14);
           }
           setIsLocating(false);
         },
-        (error) => {
-          console.warn("Geolocation error:", error);
+        () => {
           setIsLocating(false);
           if (markersRef.current.length > 0 && mapRef.current) {
             const group = L.featureGroup(markersRef.current);
@@ -149,7 +139,6 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
     }
   }, [stamps, fixMapSize]);
 
-  // マウント時に一度確実に再計算させる
   useEffect(() => {
     fixMapSize();
   }, [fixMapSize]);
@@ -171,7 +160,6 @@ const StoreMap: React.FC<StoreMapProps> = ({ stamps }) => {
         style={{ zIndex: 1 }}
       />
       
-      {/* フローティングコントロール */}
       <div className="absolute top-4 right-4 z-[10] flex flex-col gap-2">
         <button
           onClick={handleRecenter}

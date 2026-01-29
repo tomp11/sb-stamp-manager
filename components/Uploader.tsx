@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { extractStampData } from '../services/geminiService';
 import { StoreStamp } from '../types';
-import { Upload, Loader2, AlertCircle, Sparkles, CheckCircle2, Info, Clock, ExternalLink, ShieldCheck, Zap } from 'lucide-react';
+import { Upload, Loader2, AlertCircle, CheckCircle2, Clock, ShieldCheck } from 'lucide-react';
 
 interface UploaderProps {
   onAddStamps: (stamps: StoreStamp[]) => { added: number; updated: number; skipped: number };
@@ -24,8 +24,10 @@ const Uploader: React.FC<UploaderProps> = ({ onAddStamps }) => {
   const resizeImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      reader.onerror = () => reject(new Error("ファイルの読み込みに失敗しました"));
       reader.onload = (e) => {
         const img = new Image();
+        img.onerror = () => reject(new Error("画像のデコードに失敗しました"));
         img.onload = () => {
           const canvas = document.createElement('canvas');
           const MAX_SIZE = 1600; 
@@ -49,7 +51,7 @@ const Uploader: React.FC<UploaderProps> = ({ onAddStamps }) => {
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const file = event?.target?.files?.[0];
     if (!file) return;
 
     setIsProcessing(true);
@@ -65,26 +67,26 @@ const Uploader: React.FC<UploaderProps> = ({ onAddStamps }) => {
         results = await extractStampData(compressedBase64, false);
       }
       
-      if (!results || results.length === 0) {
+      if (!results || results?.length === 0) {
         throw new Error("スタンプを検出できませんでした。画像が鮮明であることを確認してください。");
       }
 
       const tempStamps: StoreStamp[] = results.map((data: any) => ({
         id: crypto.randomUUID(),
-        userId: 'guest', // ゲスト用ID
+        userId: 'guest',
         ...data,
-        lastVisitDate: data.lastVisitDate,
-        visitCount: data.visitCount,
+        lastVisitDate: data?.lastVisitDate,
+        visitCount: data?.visitCount,
       }));
       
       const counts = onAddStamps(tempStamps);
-      setSummary({ ...counts, total: results.length });
+      setSummary({ ...counts, total: results?.length });
       
-      event.target.value = '';
+      if (event.target) event.target.value = '';
     } catch (err: any) {
       console.error("Upload error:", err);
-      const msg = err.message || "";
-      const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.includes('RESOURCE_EXHAUSTED');
+      const msg = err?.message || "";
+      const isQuota = msg?.includes('429') || msg?.toLowerCase()?.includes('quota') || msg?.includes('RESOURCE_EXHAUSTED');
       setError({
         message: isQuota 
           ? "API制限に達しました。右上の「デモモード」をオンにすると、APIを消費せずにテストできます。" 
@@ -149,12 +151,12 @@ const Uploader: React.FC<UploaderProps> = ({ onAddStamps }) => {
 
         {error && (
           <div className={`mt-4 p-4 rounded-xl flex items-start text-sm animate-in slide-in-from-top-2 shadow-sm ${
-            error.isQuota ? 'bg-amber-50 border border-amber-200 text-amber-900' : 'bg-red-50 border border-red-200 text-red-800'
+            error?.isQuota ? 'bg-amber-50 border border-amber-200 text-amber-900' : 'bg-red-50 border border-red-200 text-red-800'
           }`}>
-            {error.isQuota ? <Clock className="w-5 h-5 mr-3 mt-0.5 shrink-0" /> : <AlertCircle className="w-5 h-5 mr-3 mt-0.5 shrink-0" />}
+            {error?.isQuota ? <Clock className="w-5 h-5 mr-3 mt-0.5 shrink-0" /> : <AlertCircle className="w-5 h-5 mr-3 mt-0.5 shrink-0" />}
             <div className="flex-1">
-              <p className="font-bold mb-1">{error.isQuota ? 'API制限に達しました' : '解析に失敗しました'}</p>
-              <p className="opacity-90 leading-relaxed">{error.message}</p>
+              <p className="font-bold mb-1">{error?.isQuota ? 'API制限に達しました' : '解析に失敗しました'}</p>
+              <p className="opacity-90 leading-relaxed">{error?.message}</p>
             </div>
           </div>
         )}
@@ -163,20 +165,20 @@ const Uploader: React.FC<UploaderProps> = ({ onAddStamps }) => {
           <div className="mt-4 p-4 bg-emerald-50 border border-emerald-100 rounded-xl animate-in slide-in-from-top-2">
             <div className="flex items-center gap-2 text-[#00704A] font-bold mb-2 text-sm">
               <CheckCircle2 className="w-5 h-5" />
-              解析完了（{summary.total}件）
+              解析完了（{summary?.total}件）
             </div>
             <div className="grid grid-cols-3 gap-2 text-[10px]">
               <div className="bg-white/60 p-2 rounded-lg border border-emerald-100">
                 <span className="text-gray-500 block">新規</span>
-                <span className="text-base font-black text-[#00704A]">{summary.added}</span>
+                <span className="text-base font-black text-[#00704A]">{summary?.added}</span>
               </div>
               <div className="bg-white/60 p-2 rounded-lg border border-emerald-100">
                 <span className="text-gray-500 block">更新</span>
-                <span className="text-base font-black text-amber-600">{summary.updated}</span>
+                <span className="text-base font-black text-amber-600">{summary?.updated}</span>
               </div>
               <div className="bg-white/60 p-2 rounded-lg border border-emerald-100">
                 <span className="text-gray-500 block">重複</span>
-                <span className="text-base font-black text-gray-400">{summary.skipped}</span>
+                <span className="text-base font-black text-gray-400">{summary?.skipped}</span>
               </div>
             </div>
           </div>
