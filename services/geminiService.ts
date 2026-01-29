@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
 // テスト用のサンプルデータ
@@ -40,11 +39,11 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
   }
 
   // Guidelines: ALWAYS use const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-  // The API key must be obtained exclusively from the environment variable process.env.API_KEY.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const key = import.meta.env?.VITE_GEMINI_API_KEY || process.env?.API_KEY;
+  const ai = new GoogleGenerativeAI(key as string);
 
   console.log("Gemini API: 解析開始...");
-  // Guidelines: Complex Text Tasks (multimodal reasoning and OCR) should use 'gemini-3-pro-preview'.
   const modelName = 'gemini-3-pro-preview';
   
   const prompt = `
@@ -94,7 +93,6 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
                   longitude: { type: Type.NUMBER },
                 },
                 required: ["storeName", "prefecture", "address"],
-                propertyOrdering: ["storeName", "prefecture", "address", "lastVisitDate", "visitCount", "latitude", "longitude"]
               },
             },
           },
@@ -103,7 +101,6 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
       },
     });
 
-    // Guidelines: Use the .text property directly (do not call it as a method).
     const text = response.text;
     if (!text) throw new Error("AIから空のレスポンスが返されました。");
     
