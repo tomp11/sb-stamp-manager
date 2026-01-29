@@ -41,11 +41,11 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
   // Guidelines: ALWAYS use const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
   // const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const key = import.meta.env?.VITE_GEMINI_API_KEY || process.env?.API_KEY;
-  const ai = new GoogleGenerativeAI(key as string);
+  const ai = new GoogleGenAI({ apiKey: key as string });
 
   console.log("Gemini API: 解析開始...");
-  const modelName = 'gemini-3-pro-preview';
-  
+  const modelName = 'gemini-2.5-flash-lite';
+
   const prompt = `
     You are an OCR engine for Starbucks Japan "My Store Passport".
     The input can be a SINGLE stamp detail page OR a GRID/LIST of multiple stamps.
@@ -103,7 +103,7 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
 
     const text = response.text;
     if (!text) throw new Error("AIから空のレスポンスが返されました。");
-    
+
     const parsed = JSON.parse(text.trim());
     return (parsed.stamps || []).map((s: any) => ({
       ...s,
