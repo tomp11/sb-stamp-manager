@@ -1,27 +1,26 @@
 
-// Fix: Split modular imports and type-only imports to resolve "no exported member" errors in certain environments
-import { initializeApp } from "firebase/app";
-import type { FirebaseApp } from "firebase/app";
+// Fix: Use consolidated modular imports with the 'type' keyword to resolve "no exported member" errors in certain environments.
+import { initializeApp, type FirebaseApp } from "firebase/app";
 import { 
   getAuth, 
   GoogleAuthProvider, 
   onAuthStateChanged, 
   signInWithPopup, 
-  signOut
+  signOut,
+  type Auth
 } from "firebase/auth";
-import type { Auth } from "firebase/auth";
 import { 
   initializeFirestore, 
   persistentLocalCache, 
-  persistentMultipleTabManager
+  persistentMultipleTabManager,
+  type Firestore
 } from "firebase/firestore";
-import type { Firestore } from "firebase/firestore";
 
 // 指定された優先順位で環境変数を取得 (ハイブリッド形式)
 const getEnvVal = (key: string): string | undefined => {
   const viteKey = `VITE_FIREBASE_${key}`;
   // Fix: Strictly follow the mandatory hybrid environment variable access format as requested.
-  const val = (import.meta as any).env?.[viteKey] || (typeof process !== 'undefined' ? (process as any).env?.[viteKey] : '');
+  const val = import.meta.env[viteKey] || (typeof process !== 'undefined' ? process.env[viteKey] : '');
   return val || undefined;
 };
 

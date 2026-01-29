@@ -6,7 +6,7 @@ import StoreList from './components/StoreList';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useStamps } from './hooks/useStamps';
 import { initFirebase, onAuthStateChanged, signInWithPopup, signOut } from './services/firebase';
-import { Coffee, List, Map, Trophy, AlertCircle, X, Loader2, LogIn, LogOut, Cloud, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Coffee, List, Map, Trophy, AlertCircle, X, Loader2, LogIn, LogOut, CloudUpload, CheckCircle2, RefreshCw, Save } from 'lucide-react';
 
 const StoreMap = lazy(() => import('./components/StoreMap'));
 
@@ -35,12 +35,12 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetError
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(false); 
-  const { stamps, isLoading: stampsLoading, isSyncing, addStamps, deleteStamp } = useStamps(user?.id || null);
+  const { stamps, isLoading: stampsLoading, isSyncing, isDirty, addStamps, deleteStamp, syncToCloud } = useStamps(user?.id || null);
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [syncSuccess, setSyncSuccess] = useState(false);
 
   useEffect(() => {
-    // 起動時の初期化
     const monitorAuth = async () => {
       try {
         const { auth } = await initFirebase();
@@ -86,10 +86,19 @@ const App: React.FC = () => {
     }
   };
 
+  const handleManualSync = async () => {
+    try {
+      await syncToCloud();
+      setSyncSuccess(true);
+      setTimeout(() => setSyncSuccess(false), 3000);
+    } catch (error) {
+      setGlobalError("同期中にエラーが発生しました。");
+    }
+  };
+
   const storeCount = new Set(stamps?.map(s => s?.storeName)).size;
   const prefCount = new Set(stamps?.map(s => s?.prefecture)).size;
 
-  // ローディング画面の条件を「本当に何も表示できない時」に限定
   const showFullLoading = authLoading || (user && stampsLoading && stamps.length === 0);
 
   if (showFullLoading) {
@@ -151,10 +160,28 @@ const App: React.FC = () => {
             
             <div className="flex items-center gap-3">
               {user && (
-                <div className="flex items-center gap-1.5 text-[10px] bg-white/10 px-2.5 py-1 rounded-full font-bold">
-                  {isSyncing ? <Cloud className="w-3 h-3 animate-pulse" /> : <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
-                  <span className="hidden sm:inline">{isSyncing ? '同期中' : '同期済み'}</span>
-                </div>
+                <button
+                  onClick={handleManualSync}
+                  disabled={isSyncing}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all relative ${
+                    isDirty 
+                      ? 'bg-amber-500 text-white shadow-md animate-pulse hover:bg-amber-600' 
+                      : syncSuccess 
+                        ? 'bg-emerald-500 text-white shadow-md' 
+                        : 'bg-white/10 text-white/80 hover:bg-white/20'
+                  }`}
+                >
+                  {isSyncing ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : syncSuccess ? (
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  ) : (
+                    <CloudUpload className="w-3.5 h-3.5" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {isSyncing ? '同期中...' : syncSuccess ? '同期完了' : isDirty ? '未同期あり' : '同期済み'}
+                  </span>
+                </button>
               )}
 
               {user ? (
@@ -213,6 +240,18 @@ const App: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                
+                {isDirty && user && (
+                  <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center justify-between">
+                    <p className="text-[10px] font-bold text-amber-700">クラウドに未保存の変更があります</p>
+                    <button 
+                      onClick={handleManualSync}
+                      className="text-[10px] font-black text-white bg-amber-500 px-3 py-1 rounded-full hover:bg-amber-600 transition-colors"
+                    >
+                      同期する
+                    </button>
+                  </div>
+                )}
               </div>
 
               <Uploader onAddStamps={addStamps} />
