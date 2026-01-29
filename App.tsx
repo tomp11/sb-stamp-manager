@@ -8,7 +8,6 @@ import { useStamps } from './hooks/useStamps';
 import { initFirebase, onAuthStateChanged, signInWithPopup, signOut } from './services/firebase';
 import { Coffee, List, Map, Trophy, AlertCircle, X, Loader2, LogIn, LogOut, Cloud, CheckCircle2, RefreshCw } from 'lucide-react';
 
-// Lazy load the map component to reduce initial bundle size and allow Suspense to work
 const StoreMap = lazy(() => import('./components/StoreMap'));
 
 const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) => (
@@ -35,7 +34,7 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetError
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const { stamps, isLoading: stampsLoading, isSyncing, addStamps, deleteStamp, migrateLocalToCloud } = useStamps(user?.id || null);
+  const { stamps, isLoading: stampsLoading, isSyncing, addStamps, deleteStamp } = useStamps(user?.id || null);
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -46,42 +45,31 @@ const App: React.FC = () => {
         const { auth } = await initFirebase();
         onAuthStateChanged(auth, (firebaseUser) => {
           if (firebaseUser) {
-            const profile = {
+            setUser({
               id: firebaseUser.uid,
               name: firebaseUser.displayName || 'User',
               email: firebaseUser.email || '',
               picture: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Starbucks'
-            };
-            setUser(profile);
-            migrateLocalToCloud(firebaseUser.uid);
+            });
           } else {
             setUser(null);
           }
           setAuthLoading(false);
         });
       } catch (e) {
+        console.error("Auth initialization error:", e);
         setAuthLoading(false);
       }
     };
     monitorAuth();
-  }, [migrateLocalToCloud]);
+  }, []);
 
   const handleLogin = async () => {
     try {
       const { auth, googleProvider } = await initFirebase();
-      const result = await signInWithPopup(auth, googleProvider);
-      if (result?.user) {
-        const profile = {
-          id: result.user.uid,
-          name: result.user.displayName || 'User',
-          email: result.user.email || '',
-          picture: result.user.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Starbucks'
-        };
-        setUser(profile);
-        await migrateLocalToCloud(result.user.uid);
-      }
+      await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
-      setGlobalError(error?.message || "ログインに失敗しました。ゲストモードで継続できます。");
+      setGlobalError(error?.message || "ログインに失敗しました。");
     }
   };
 
@@ -99,12 +87,14 @@ const App: React.FC = () => {
   const storeCount = new Set(stamps?.map(s => s?.storeName)).size;
   const prefCount = new Set(stamps?.map(s => s?.prefecture)).size;
 
-  if (stampsLoading || authLoading) {
+  if (authLoading || (user && stampsLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-[#00704A] animate-spin mx-auto mb-4" />
-          <p className="text-gray-500 font-medium">コレクションを準備中...</p>
+          <p className="text-gray-500 font-medium animate-pulse">
+            {authLoading ? 'アカウントを確認中...' : 'コレクションを読み込み中...'}
+          </p>
         </div>
       </div>
     );

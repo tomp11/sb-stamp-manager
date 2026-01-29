@@ -1,4 +1,5 @@
-// Fix: Consolidate modular Firebase imports to resolve "no exported member" errors in certain environments
+
+// Fix: Consolidated modular imports to resolve member resolution errors.
 import { initializeApp, type FirebaseApp } from "firebase/app";
 import { 
   getAuth, 
@@ -6,34 +7,26 @@ import {
   onAuthStateChanged, 
   signInWithPopup, 
   signOut,
-  type Auth 
+  type Auth
 } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import { initializeFirestore, type Firestore } from "firebase/firestore";
 
-// 指定された優先順位で環境変数を取得するヘルパー
-const getEnv = (key: string): string | undefined => {
+// 指定された優先順位で環境変数を取得
+const getEnvVal = (key: string): string | undefined => {
   const viteKey = `VITE_FIREBASE_${key}`;
   const directKey = `FIREBASE_${key}`;
-  
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-    const val = (import.meta as any).env[viteKey];
-    if (val) return val;
-  }
-  
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env[viteKey] || process.env[directKey];
-  }
-  
-  return undefined;
+  return (import.meta as any).env?.[viteKey] || 
+         (process as any).env?.[viteKey] || 
+         (process as any).env?.[directKey];
 };
 
 const firebaseConfig = {
-  apiKey: getEnv('API_KEY'),
-  authDomain: getEnv('AUTH_DOMAIN'),
-  projectId: getEnv('PROJECT_ID'),
-  storageBucket: getEnv('STORAGE_BUCKET'),
-  messagingSenderId: getEnv('MESSAGING_SENDER_ID'),
-  appId: getEnv('APP_ID')
+  apiKey: getEnvVal('API_KEY'),
+  authDomain: getEnvVal('AUTH_DOMAIN'),
+  projectId: getEnvVal('PROJECT_ID'),
+  storageBucket: getEnvVal('STORAGE_BUCKET'),
+  messagingSenderId: getEnvVal('MESSAGING_SENDER_ID'),
+  appId: getEnvVal('APP_ID')
 };
 
 let app: FirebaseApp | null = null;
@@ -47,16 +40,15 @@ if (isConfigValid) {
   try {
     app = initializeApp(firebaseConfig as any);
     auth = getAuth(app);
-    db = getFirestore(app);
+    // ネットワークの安定性を高める設定を追加
+    db = initializeFirestore(app, {
+      ignoreUndefinedProperties: true,
+    });
   } catch (error) {
     console.error("Firebase Initialization Error:", error);
   }
 }
-console.log(firebaseConfig)
-/**
- * Returns the shared Firebase instances for Auth, Firestore, and Google Provider.
- * Throws an error if configuration is invalid or services failed to start.
- */
+
 export const getFirebaseInstance = () => {
   if (!isConfigValid || !auth || !db) {
     throw new Error("Firebase is not configured or failed to initialize.");

@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import '../shim';
 
@@ -71,7 +72,6 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
   };
 
   try {
-    // CRITICAL: Use ai.models.generateContent directly with model name and parts
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: { parts: [imagePart, { text: prompt }] },
@@ -102,7 +102,7 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
       },
     });
 
-    // CRITICAL: Access .text property directly (do not call as a method)
+    // Fix: Access the .text property directly as per @google/genai guidelines
     const text = response.text;
     if (!text) throw new Error("AIから空のレスポンスが返されました。");
     
