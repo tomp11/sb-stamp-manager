@@ -40,9 +40,9 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
     return MOCK_DATA;
   }
 
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? (process as any).env?.VITE_GEMINI_API_KEY : '');
-  console.log(apiKey)
-  const ai = new GoogleGenAI({ apiKey: apiKey });
+  // Fix: Strictly follow the mandatory hybrid environment variable access format as requested.
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : '');
+  const ai = new GoogleGenAI({apiKey:  apiKey });
 
   console.log("Gemini API: 解析開始...");
 

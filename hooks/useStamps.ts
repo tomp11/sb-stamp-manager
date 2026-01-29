@@ -12,11 +12,11 @@ export const useStamps = (userId: string | null) => {
   const [stamps, setStamps] = useState<StoreStamp[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isDirty, setIsDirty] = useState(false); // 未同期の変更があるかどうか
   const isInitialLoad = useRef(true);
 
-  // データの取得と移行のフローを高速化
+  // データの取得と移行のフロー
   const initializeData = useCallback(async (currentUserId: string | null) => {
-    // ログイン状況にかかわらず、まずローカルストレージの内容を仮表示（LCPの向上）
     const saved = localStorage.getItem(STORAGE_KEY);
     let initialLocalStamps: StoreStamp[] = [];
     if (saved) {
@@ -24,7 +24,7 @@ export const useStamps = (userId: string | null) => {
         initialLocalStamps = JSON.parse(saved);
         if (!currentUserId) {
           setStamps(initialLocalStamps);
-          setIsLoading(false); // ゲストならここでロード終了
+          setIsLoading(false);
           isInitialLoad.current = false;
         }
       } catch (e) {
@@ -37,13 +37,10 @@ export const useStamps = (userId: string | null) => {
 
     if (!currentUserId) return;
 
-    // ログイン済みの場合のみクラウド同期を実行
     setIsLoading(true);
     try {
-      // クラウドから取得（Firebaseの永続性キャッシュが効いている場合は即座に返る）
       const cloudStamps = await loadStampsFromDB(currentUserId);
       
-      // 移行ロジック（ローカルに未同期データがある場合）
       if (initialLocalStamps.length > 0) {
         const cloudMap = new Map();
         cloudStamps.forEach(s => cloudMap.set(normalizeStoreName(s.storeName), s));
@@ -84,32 +81,28 @@ export const useStamps = (userId: string | null) => {
     } finally {
       setIsLoading(false);
       isInitialLoad.current = false;
+      setIsDirty(false);
     }
   }, []);
 
-  // userIdが確定したタイミングで走る
   useEffect(() => {
     initializeData(userId);
   }, [userId, initializeData]);
 
-  // クラウド同期（デバウンス処理）
-  useEffect(() => {
-    if (isLoading || isInitialLoad.current || !userId) return;
-
-    const sync = async () => {
-      setIsSyncing(true);
-      try {
-        await saveStampsToDB(stamps, userId);
-      } catch (e) {
-        console.error("Cloud sync error:", e);
-      } finally {
-        setIsSyncing(false);
-      }
-    };
-
-    const timer = setTimeout(sync, 2000); 
-    return () => clearTimeout(timer);
-  }, [stamps, userId, isLoading]);
+  // 手動同期関数
+  const syncToCloud = useCallback(async () => {
+    if (!userId || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await saveStampsToDB(stamps, userId);
+      setIsDirty(false);
+    } catch (e) {
+      console.error("Cloud sync error:", e);
+      throw e;
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [stamps, userId, isSyncing]);
 
   const addStamps = useCallback((newStamps: StoreStamp[]) => {
     let added = 0;
@@ -145,9 +138,10 @@ export const useStamps = (userId: string | null) => {
         }
       });
       
-      // ゲストモード時は即座にlocalStorageに保存
       if (!userId) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedList));
+      } else {
+        setIsDirty(true); // ログイン中は未同期フラグを立てる
       }
       return [...updatedList];
     });
@@ -160,6 +154,8 @@ export const useStamps = (userId: string | null) => {
       const newList = prev.filter(s => s.id !== id);
       if (!userId) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
+      } else {
+        setIsDirty(true); // ログイン中は未同期フラグを立てる
       }
       return newList;
     });
@@ -168,5 +164,5 @@ export const useStamps = (userId: string | null) => {
     }
   }, [userId]);
 
-  return { stamps, isLoading, isSyncing, addStamps, deleteStamp };
+  return { stamps, isLoading, isSyncing, isDirty, addStamps, deleteStamp, syncToCloud };
 };
