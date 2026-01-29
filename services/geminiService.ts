@@ -39,13 +39,13 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
     return MOCK_DATA;
   }
 
-  // Guidelines: Always use const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+  // Guidelines: ALWAYS use const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
   // The API key must be obtained exclusively from the environment variable process.env.API_KEY.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   console.log("Gemini API: 解析開始...");
-  // Guidelines: Using 'gemini-3-pro-preview' for complex text reasoning and OCR tasks.
-  const model = 'gemini-3-pro-preview';
+  // Guidelines: Complex Text Tasks (multimodal reasoning and OCR) should use 'gemini-3-pro-preview'.
+  const modelName = 'gemini-3-pro-preview';
   
   const prompt = `
     You are an OCR engine for Starbucks Japan "My Store Passport".
@@ -57,7 +57,8 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
     3. lastVisitDate: "YYYY/MM/DD" or null if not visible.
     4. visitCount: Integer or null if not visible.
     5. address: Full Japanese address.
-    6. coordinates: Numeric latitude/longitude.
+    6. latitude: Numeric latitude or null.
+    7. longitude: Numeric longitude or null.
 
     Return JSON with a "stamps" array.
   `;
@@ -71,10 +72,10 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
 
   try {
     const response = await ai.models.generateContent({
-      model,
+      model: modelName,
       contents: { parts: [imagePart, { text: prompt }] },
       config: {
-        thinkingConfig: { thinkingBudget: 2048 },
+        thinkingConfig: { thinkingBudget: 4096 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -93,6 +94,7 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
                   longitude: { type: Type.NUMBER },
                 },
                 required: ["storeName", "prefecture", "address"],
+                propertyOrdering: ["storeName", "prefecture", "address", "lastVisitDate", "visitCount", "latitude", "longitude"]
               },
             },
           },
@@ -101,11 +103,11 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
       },
     });
 
-    // Guidelines: Extracting text output from GenerateContentResponse using .text property.
+    // Guidelines: Use the .text property directly (do not call it as a method).
     const text = response.text;
     if (!text) throw new Error("AIから空のレスポンスが返されました。");
     
-    const parsed = JSON.parse(text);
+    const parsed = JSON.parse(text.trim());
     return (parsed.stamps || []).map((s: any) => ({
       ...s,
       latitude: typeof s.latitude === 'number' && !isNaN(s.latitude) ? s.latitude : undefined,
