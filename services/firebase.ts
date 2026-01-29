@@ -42,7 +42,7 @@ if (isConfigValid) {
     console.error("Firebase Initialization Error:", error);
   }
 }
-
+console.log(firebaseConfig)
 /**
  * Returns the shared Firebase instances for Auth, Firestore, and Google Provider.
  * Throws an error if configuration is invalid or services failed to start.
