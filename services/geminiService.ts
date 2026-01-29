@@ -39,11 +39,20 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
     return MOCK_DATA;
   }
 
-  // Fix: Always use process.env.API_KEY directly when initializing the GoogleGenAI client instance.
+  // AI Studio環境では、システムから process.env.API_KEY が提供されます。
+  // process オブジェクトが存在しない環境でのクラッシュを防ぎつつ、規定の変数を使用します。
+  const apiKey = (typeof process !== 'undefined' && process.env?.API_KEY) 
+    ? process.env.API_KEY 
+    : import.meta.env.VITE_GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Gemini APIキーが取得できませんでした。");
+  }
+
+  // ガイドラインに従い、直接 process.env.API_KEY を使用して初期化します。
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   console.log("Gemini API: 解析開始...");
-  // Fix: Select gemini-3-pro-preview for complex reasoning and data extraction tasks.
   const model = 'gemini-3-pro-preview';
   
   const prompt = `
@@ -69,12 +78,10 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
   };
 
   try {
-    // Fix: Call generateContent with model and contents as per guidelines.
     const response = await ai.models.generateContent({
       model,
       contents: { parts: [imagePart, { text: prompt }] },
       config: {
-        // Fix: Use thinkingConfig for Gemini 3 models to improve extraction accuracy.
         thinkingConfig: { thinkingBudget: 2048 },
         responseMimeType: "application/json",
         responseSchema: {
@@ -102,7 +109,6 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
       },
     });
 
-    // Fix: Access response text via property, not method.
     const text = response.text;
     if (!text) throw new Error("AIから空のレスポンスが返されました。");
     

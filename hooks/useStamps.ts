@@ -5,6 +5,10 @@ import { loadStampsFromDB, saveStampsToDB, deleteStampFromDB } from '../services
 
 const STORAGE_KEY = 'my_store_passports';
 
+// 店舗名の正規化（名寄せ用）
+const normalizeStoreName = (name: string) => 
+  (name || '').trim().normalize('NFKC').replace(/\s+/g, '').replace(/[（(]/g, '(').replace(/[）)]/g, ')');
+
 export const useStamps = (userId: string | null) => {
   const [stamps, setStamps] = useState<StoreStamp[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,7 +44,6 @@ export const useStamps = (userId: string | null) => {
 
   // データ変更時の保存処理（同期）
   useEffect(() => {
-    // 初回読み込み完了前は保存しない
     if (isLoading || isInitialLoad.current) return;
 
     if (userId) {
@@ -54,7 +57,6 @@ export const useStamps = (userId: string | null) => {
           setIsSyncing(false);
         }
       };
-      // デバウンスを少し短縮して体感速度を向上
       const timer = setTimeout(sync, 1000);
       return () => clearTimeout(timer);
     } else {
@@ -62,23 +64,68 @@ export const useStamps = (userId: string | null) => {
     }
   }, [stamps, userId, isLoading]);
 
-  // ログイン時のマイグレーション
+  /**
+   * スマート・マイグレーション: ログイン時のLocalからCloudへのデータ引き継ぎ
+   */
   const migrateLocalToCloud = useCallback(async (newUserId: string) => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return;
 
     try {
       const localStamps: StoreStamp[] = JSON.parse(saved);
-      if (localStamps.length > 0) {
-        setIsSyncing(true);
-        await saveStampsToDB(localStamps, newUserId);
-        localStorage.removeItem(STORAGE_KEY);
-        const mergedData = await loadStampsFromDB(newUserId);
-        setStamps(mergedData);
-        setIsSyncing(false);
+      if (localStamps.length === 0) return;
+
+      setIsSyncing(true);
+      
+      // 1. クラウド側の既存データを取得してマージの準備
+      const cloudStamps = await loadStampsFromDB(newUserId);
+      const cloudMap = new Map();
+      cloudStamps.forEach(s => cloudMap.set(normalizeStoreName(s.storeName), s));
+
+      const stampsToUpload: StoreStamp[] = [];
+      
+      // 2. LocalデータをCloudデータと比較してマージ
+      localStamps.forEach(localS => {
+        const normalizedName = normalizeStoreName(localS.storeName);
+        const existingCloud = cloudMap.get(normalizedName);
+
+        if (existingCloud) {
+          // すでにクラウドにある場合、より「進んでいる」データを採用
+          const localDate = localS.lastVisitDate || "";
+          const cloudDate = existingCloud.lastVisitDate || "";
+          const localCount = localS.visitCount || 0;
+          const cloudCount = existingCloud.visitCount || 0;
+
+          if (localDate > cloudDate || localCount > cloudCount) {
+            // Localの方が新しい、または訪問回数が多い場合は更新対象
+            stampsToUpload.push({
+              ...existingCloud,
+              ...localS,
+              id: existingCloud.id // Cloud側のIDを維持
+            });
+          }
+        } else {
+          // クラウドにない場合は新規追加
+          stampsToUpload.push({ ...localS, userId: newUserId });
+        }
+      });
+
+      // 3. 必要なデータのみFirestoreへ保存
+      if (stampsToUpload.length > 0) {
+        await saveStampsToDB(stampsToUpload, newUserId);
       }
+
+      // 4. Firestore保存成功後のみLocalStorageをクリア (Atomic cleanup)
+      localStorage.removeItem(STORAGE_KEY);
+      
+      // 5. 最新の統合データを画面に反映
+      const finalData = await loadStampsFromDB(newUserId);
+      setStamps(finalData);
+      
+      console.log(`Migration complete: ${stampsToUpload.length} stamps integrated.`);
     } catch (e) {
       console.error("Migration error:", e);
+    } finally {
       setIsSyncing(false);
     }
   }, []);
@@ -88,22 +135,16 @@ export const useStamps = (userId: string | null) => {
     let updated = 0;
     let skipped = 0;
 
-    const normalizeName = (name: string) => 
-      name.trim().normalize('NFKC').replace(/\s+/g, '').replace(/[（(]/g, '(').replace(/[）)]/g, ')');
-
     setStamps(prev => {
       const updatedList = [...prev];
       newStamps.forEach(newS => {
-        const normalizedNew = normalizeName(newS.storeName);
-        const existingIndex = updatedList.findIndex(s => normalizeName(s.storeName) === normalizedNew);
+        const normalizedNew = normalizeStoreName(newS.storeName);
+        const existingIndex = updatedList.findIndex(s => normalizeStoreName(s.storeName) === normalizedNew);
 
         if (existingIndex > -1) {
           const existing = updatedList[existingIndex];
-          const newHasDate = !!newS.lastVisitDate;
-          const newHasCount = newS.visitCount !== undefined;
-          
-          const isMoreRecent = newHasDate && (!existing.lastVisitDate || newS.lastVisitDate > existing.lastVisitDate);
-          const isMoreVisits = newHasCount && (existing.visitCount === undefined || (newS.visitCount || 0) > (existing.visitCount || 0));
+          const isMoreRecent = (newS.lastVisitDate || "") > (existing.lastVisitDate || "");
+          const isMoreVisits = (newS.visitCount || 0) > (existing.visitCount || 0);
 
           if (isMoreRecent || isMoreVisits) {
             updatedList[existingIndex] = {
@@ -130,7 +171,6 @@ export const useStamps = (userId: string | null) => {
 
   const deleteStamp = useCallback((id: string) => {
     setStamps(prev => prev.filter(s => s.id !== id));
-    // Firestoreからも即座に削除
     if (userId) {
       deleteStampFromDB(userId, id).catch(console.error);
     }
