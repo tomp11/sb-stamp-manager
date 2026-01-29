@@ -1,6 +1,10 @@
-import { initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, type Auth } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+// Separating type and value imports to resolve potential 'no exported member' errors in modular SDK environments
+import { initializeApp } from "firebase/app";
+import type { FirebaseApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import type { Auth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import type { Firestore } from "firebase/firestore";
 
 // Safe helper to access environment variables without ReferenceError
 const safeGetEnv = (key: string): string | undefined => {
@@ -27,9 +31,10 @@ const googleProvider = new GoogleAuthProvider();
 
 const isConfigValid = !!firebaseConfig.apiKey && !!firebaseConfig.projectId;
 
-// Use combined imports and modern named export syntax for Firebase v9+ to fix recognition issues
+// Use modern named exports and modular initialization for Firebase v9+ to ensure reliability
 if (isConfigValid) {
   try {
+    // Initializing Firebase App, Auth, and Firestore using modular SDK functions
     app = initializeApp(firebaseConfig as any);
     auth = getAuth(app);
     db = getFirestore(app);
@@ -38,6 +43,10 @@ if (isConfigValid) {
   }
 }
 
+/**
+ * Returns the shared Firebase instances for Auth, Firestore, and Google Provider.
+ * Throws an error if configuration is invalid or services failed to start.
+ */
 export const getFirebaseInstance = () => {
   if (!isConfigValid || !auth || !db) {
     throw new Error("Firebase is not configured or failed to initialize.");
@@ -47,5 +56,6 @@ export const getFirebaseInstance = () => {
 
 export const initFirebase = async () => getFirebaseInstance();
 
+// Named exports for modular Auth methods and types to support tree-shaking and type safety
 export { onAuthStateChanged, signInWithPopup, signOut };
 export type { Auth, Firestore, FirebaseApp };

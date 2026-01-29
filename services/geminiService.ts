@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 // テスト用のサンプルデータ
@@ -43,23 +44,25 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
   const key = import.meta.env?.VITE_GEMINI_API_KEY || process.env?.API_KEY;
   const ai = new GoogleGenAI({ apiKey: key as string });
 
-  console.log("Gemini API: 解析開始...");
-  const modelName = 'gemini-2.5-flash-lite';
+  const modelName = 'gemini-3-flash-preview';
 
   const prompt = `
-    You are an OCR engine for Starbucks Japan "My Store Passport".
-    The input can be a SINGLE stamp detail page OR a GRID/LIST of multiple stamps.
+    あなたはスターバックスの「マイストアパスポート」のスタンプ画像を解析する専門家です。
+    画像から以下の情報を抽出し、JSON形式で返却してください。
 
-    EXTRACTION FIELDS:
-    1. storeName: EXACT name (e.g., "目黒店"). 
-    2. prefecture: e.g., "東京都"
-    3. lastVisitDate: "YYYY/MM/DD" or null if not visible.
-    4. visitCount: Integer or null if not visible.
-    5. address: Full Japanese address.
-    6. latitude: Numeric latitude or null.
-    7. longitude: Numeric longitude or null.
+    【抽出項目】
+    1. storeName: 店舗名（例：「目黒店」）。画像に記載されている正確な名称。
+    2. prefecture: 都道府県（例：「東京都」）。
+    3. lastVisitDate: 最終訪問日（"YYYY/MM/DD"形式）。不明な場合は null。
+    4. visitCount: 訪問回数（数値）。不明な場合は null。
+    5. address: 店舗のフル住所。
+    6. latitude: 店舗の緯度。あなたの知識ベースから正確な数値を特定してください。
+    7. longitude: 店舗の経度。あなたの知識ベースから正確な数値を特定してください。
 
-    Return JSON with a "stamps" array.
+    【重要】
+    - 入力画像には複数のスタンプが並んでいる（グリッド表示）場合と、1つの店舗の詳細画面の場合があります。
+    - 全ての検出された店舗を stamps 配列に含めてください。
+    - 緯度・経度は住所から推測するのではなく、可能な限り実際の店舗位置に合致する正確な値を出力してください。
   `;
 
   const imagePart = {
@@ -74,7 +77,6 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
       model: modelName,
       contents: { parts: [imagePart, { text: prompt }] },
       config: {
-        thinkingConfig: { thinkingBudget: 4096 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
