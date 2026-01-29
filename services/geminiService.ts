@@ -46,7 +46,8 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
 
   console.log("Gemini API: 解析開始...");
   
-  const prompt = `
+  // Fix: Move static extraction rules to systemInstruction for better model control.
+  const systemInstruction = `
     あなたはスターバックスの「マイストアパスポート」のスタンプ画像を解析する専門家です。
     画像から以下の情報を抽出し、JSON形式で返却してください。
 
@@ -73,10 +74,12 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
   };
 
   try {
+    // Fix: Upgrade to gemini-3-pro-preview for complex reasoning tasks like image data extraction.
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: { parts: [imagePart, { text: prompt }] },
+      model: 'gemini-3-pro-preview',
+      contents: { parts: [imagePart, { text: "画像から店舗スタンプの情報を抽出してください。" }] },
       config: {
+        systemInstruction: systemInstruction,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,

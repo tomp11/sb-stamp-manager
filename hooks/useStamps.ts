@@ -14,81 +14,85 @@ export const useStamps = (userId: string | null) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const isInitialLoad = useRef(true);
 
-  // データの取得と移行を一つのフローに統合
+  // データの取得と移行のフローを高速化
   const initializeData = useCallback(async (currentUserId: string | null) => {
+    // ログイン状況にかかわらず、まずローカルストレージの内容を仮表示（LCPの向上）
+    const saved = localStorage.getItem(STORAGE_KEY);
+    let initialLocalStamps: StoreStamp[] = [];
+    if (saved) {
+      try {
+        initialLocalStamps = JSON.parse(saved);
+        if (!currentUserId) {
+          setStamps(initialLocalStamps);
+          setIsLoading(false); // ゲストならここでロード終了
+          isInitialLoad.current = false;
+        }
+      } catch (e) {
+        console.error("Local storage parse error", e);
+      }
+    } else if (!currentUserId) {
+      setIsLoading(false);
+      isInitialLoad.current = false;
+    }
+
+    if (!currentUserId) return;
+
+    // ログイン済みの場合のみクラウド同期を実行
     setIsLoading(true);
     try {
-      if (currentUserId) {
-        // 1. まずクラウドから最新データを取得
-        const cloudStamps = await loadStampsFromDB(currentUserId);
+      // クラウドから取得（Firebaseの永続性キャッシュが効いている場合は即座に返る）
+      const cloudStamps = await loadStampsFromDB(currentUserId);
+      
+      // 移行ロジック（ローカルに未同期データがある場合）
+      if (initialLocalStamps.length > 0) {
+        const cloudMap = new Map();
+        cloudStamps.forEach(s => cloudMap.set(normalizeStoreName(s.storeName), s));
+
+        const stampsToUpload: StoreStamp[] = [];
+        const mergedList = [...cloudStamps];
         
-        // 2. ローカルに未同期のデータがあるか確認
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const localStamps: StoreStamp[] = JSON.parse(saved);
-          if (localStamps.length > 0) {
-            // 移行が必要な場合のみ実行
-            const cloudMap = new Map();
-            cloudStamps.forEach(s => cloudMap.set(normalizeStoreName(s.storeName), s));
+        initialLocalStamps.forEach(localS => {
+          const normalizedName = normalizeStoreName(localS.storeName);
+          const existingCloud = cloudMap.get(normalizedName);
 
-            const stampsToUpload: StoreStamp[] = [];
-            const mergedList = [...cloudStamps];
-            
-            localStamps.forEach(localS => {
-              const normalizedName = normalizeStoreName(localS.storeName);
-              const existingCloud = cloudMap.get(normalizedName);
-
-              if (existingCloud) {
-                const localDate = localS.lastVisitDate || "";
-                const cloudDate = existingCloud.lastVisitDate || "";
-                if (localDate > cloudDate || (localS.visitCount || 0) > (existingCloud.visitCount || 0)) {
-                  const updated = { ...existingCloud, ...localS, id: existingCloud.id };
-                  stampsToUpload.push(updated);
-                  const idx = mergedList.findIndex(s => s.id === existingCloud.id);
-                  if (idx > -1) mergedList[idx] = updated;
-                }
-              } else {
-                const newStamp = { ...localS, userId: currentUserId };
-                stampsToUpload.push(newStamp);
-                mergedList.push(newStamp);
-              }
-            });
-
-            if (stampsToUpload.length > 0) {
-              await saveStampsToDB(stampsToUpload, currentUserId);
+          if (existingCloud) {
+            const localDate = localS.lastVisitDate || "";
+            const cloudDate = existingCloud.lastVisitDate || "";
+            if (localDate > cloudDate || (localS.visitCount || 0) > (existingCloud.visitCount || 0)) {
+              const updated = { ...existingCloud, ...localS, id: existingCloud.id };
+              stampsToUpload.push(updated);
+              const idx = mergedList.findIndex(s => s.id === existingCloud.id);
+              if (idx > -1) mergedList[idx] = updated;
             }
-            localStorage.removeItem(STORAGE_KEY);
-            setStamps(mergedList);
-            setIsLoading(false);
-            return;
+          } else {
+            const newStamp = { ...localS, userId: currentUserId };
+            stampsToUpload.push(newStamp);
+            mergedList.push(newStamp);
           }
+        });
+
+        if (stampsToUpload.length > 0) {
+          await saveStampsToDB(stampsToUpload, currentUserId);
         }
-        setStamps(cloudStamps);
+        localStorage.removeItem(STORAGE_KEY);
+        setStamps(mergedList);
       } else {
-        // ゲストモードの場合
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          try {
-            setStamps(JSON.parse(saved));
-          } catch (e) {
-            setStamps([]);
-          }
-        }
+        setStamps(cloudStamps);
       }
     } catch (error) {
-      console.error("Data initialization error:", error);
+      console.error("Cloud data initialization error:", error);
     } finally {
       setIsLoading(false);
       isInitialLoad.current = false;
     }
   }, []);
 
-  // userIdが確定したタイミングで一回だけ走る
+  // userIdが確定したタイミングで走る
   useEffect(() => {
     initializeData(userId);
   }, [userId, initializeData]);
 
-  // 定期的な自動保存（クラウド同期）
+  // クラウド同期（デバウンス処理）
   useEffect(() => {
     if (isLoading || isInitialLoad.current || !userId) return;
 
@@ -103,7 +107,7 @@ export const useStamps = (userId: string | null) => {
       }
     };
 
-    const timer = setTimeout(sync, 2000); // 頻度を少し下げて負荷を軽減
+    const timer = setTimeout(sync, 2000); 
     return () => clearTimeout(timer);
   }, [stamps, userId, isLoading]);
 
@@ -140,6 +144,11 @@ export const useStamps = (userId: string | null) => {
           added++;
         }
       });
+      
+      // ゲストモード時は即座にlocalStorageに保存
+      if (!userId) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedList));
+      }
       return [...updatedList];
     });
 
@@ -147,7 +156,13 @@ export const useStamps = (userId: string | null) => {
   }, [userId]);
 
   const deleteStamp = useCallback((id: string) => {
-    setStamps(prev => prev.filter(s => s.id !== id));
+    setStamps(prev => {
+      const newList = prev.filter(s => s.id !== id);
+      if (!userId) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
+      }
+      return newList;
+    });
     if (userId) {
       deleteStampFromDB(userId, id).catch(console.error);
     }

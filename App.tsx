@@ -34,13 +34,13 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetError
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  // 初期ロード中の authLoading を false にし、認証を待たずにゲストモードで開始
   const [authLoading, setAuthLoading] = useState(false); 
   const { stamps, isLoading: stampsLoading, isSyncing, addStamps, deleteStamp } = useStamps(user?.id || null);
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const [globalError, setGlobalError] = useState<string | null>(null);
 
   useEffect(() => {
+    // 起動時の初期化
     const monitorAuth = async () => {
       try {
         const { auth } = await initFirebase();
@@ -89,14 +89,16 @@ const App: React.FC = () => {
   const storeCount = new Set(stamps?.map(s => s?.storeName)).size;
   const prefCount = new Set(stamps?.map(s => s?.prefecture)).size;
 
-  // 起動時の認証待機を排除し、ログイン済みのユーザーデータを取得しているときだけローディングを表示
-  if (authLoading || (user && stampsLoading)) {
+  // ローディング画面の条件を「本当に何も表示できない時」に限定
+  const showFullLoading = authLoading || (user && stampsLoading && stamps.length === 0);
+
+  if (showFullLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-[#00704A] animate-spin mx-auto mb-4" />
           <p className="text-gray-500 font-medium animate-pulse">
-            {authLoading ? '認証中...' : 'コレクションを読み込み中...'}
+            {authLoading ? '認証中...' : 'コレクションを同期中...'}
           </p>
         </div>
       </div>
@@ -105,7 +107,7 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => window.location.reload()}>
-      <div className="min-h-screen bg-[#f3f4f6] pb-24 font-sans">
+      <div className="min-h-screen bg-[#f3f4f6] pb-24 font-sans animate-in fade-in duration-500">
         {globalError && (
           <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-xl animate-in slide-in-from-top-4">
             <div className="bg-red-600 text-white p-4 rounded-xl shadow-2xl flex items-center justify-between border-2 border-white/20">
@@ -216,7 +218,7 @@ const App: React.FC = () => {
               <Uploader onAddStamps={addStamps} />
             </div>
 
-            <div className="lg:col-span-8">
+            <div className="lg:col-span-8 min-h-[400px]">
               <Suspense fallback={
                 <div className="w-full h-[500px] flex flex-col items-center justify-center bg-white rounded-2xl border border-dashed border-gray-200">
                    <Loader2 className="w-10 h-10 text-emerald-200 animate-spin mb-4" />

@@ -1,26 +1,28 @@
 
-// Fix: Consolidated imports and using standard modular syntax to resolve "no exported member" issues.
-import { initializeApp, FirebaseApp } from "firebase/app";
+// Fix: Split modular imports and type-only imports to resolve "no exported member" errors in certain environments
+import { initializeApp } from "firebase/app";
+import type { FirebaseApp } from "firebase/app";
 import { 
   getAuth, 
   GoogleAuthProvider, 
   onAuthStateChanged, 
   signInWithPopup, 
-  signOut,
-  Auth
+  signOut
 } from "firebase/auth";
-import { initializeFirestore, Firestore } from "firebase/firestore";
+import type { Auth } from "firebase/auth";
+import { 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager
+} from "firebase/firestore";
+import type { Firestore } from "firebase/firestore";
 
-// Fix: Use mandatory hybrid environment variable access format as per project guidelines.
+// 指定された優先順位で環境変数を取得 (ハイブリッド形式)
 const getEnvVal = (key: string): string | undefined => {
   const viteKey = `VITE_FIREBASE_${key}`;
-  
-  // Explicit hybrid check for compatibility between Vite and other environments
-  const val = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[viteKey]) || 
-              (typeof process !== 'undefined' && process.env && process.env[viteKey]) || 
-              undefined;
-  
-  return val;
+  // Fix: Strictly follow the mandatory hybrid environment variable access format as requested.
+  const val = (import.meta as any).env?.[viteKey] || (typeof process !== 'undefined' ? (process as any).env?.[viteKey] : '');
+  return val || undefined;
 };
 
 const firebaseConfig = {
@@ -44,12 +46,14 @@ if (isConfigValid) {
     app = initializeApp(firebaseConfig as any);
     auth = getAuth(app);
     
-    // 【重要】ネットワークのハングを防止する設定
-    // experimentalForceLongPolling: true は、WebSocketsが不安定な環境で
-    // Firestoreの接続を劇的に安定させ、読み込みの「止まり」を解消します。
+    // 【パフォーマンス改善】オフラインキャッシュを有効化
+    // これにより、ネットワーク接続を待たずに前回取得したデータを即座に表示できます
     db = initializeFirestore(app, {
       ignoreUndefinedProperties: true,
-      experimentalForceLongPolling: true, 
+      localCache: persistentLocalCache({ 
+        tabManager: persistentMultipleTabManager() 
+      }),
+      experimentalForceLongPolling: true, // ネットワークハング防止を継続
       useFetchStreams: false 
     });
   } catch (error) {
