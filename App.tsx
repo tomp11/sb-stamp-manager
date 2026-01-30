@@ -5,8 +5,8 @@ import Uploader from './components/Uploader';
 import StoreList from './components/StoreList';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useStamps } from './hooks/useStamps';
-import { initFirebase, onAuthStateChanged, signInWithPopup, signOut } from './services/firebase';
-import { Coffee, List, Map, Trophy, AlertCircle, X, Loader2, LogIn, LogOut, CloudUpload, CheckCircle2, RefreshCw, Save } from 'lucide-react';
+import { initFirebase, onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from './services/firebase';
+import { Coffee, List, Map, Trophy, AlertCircle, X, Loader2, LogIn, LogOut, CloudUpload, CheckCircle2, RefreshCw } from 'lucide-react';
 
 const StoreMap = lazy(() => import('./components/StoreMap'));
 
@@ -17,25 +17,15 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetError
         <AlertCircle className="w-8 h-8 text-red-500" />
       </div>
       <h1 className="text-2xl font-bold text-gray-900 mb-2">エラーが発生しました</h1>
-      <p className="text-gray-500 mb-6">アプリの実行中に予期せぬエラーが発生しました。</p>
-      <div className="bg-red-50 rounded-xl p-4 mb-8 text-left overflow-auto max-h-40">
-        <p className="text-xs font-mono text-red-700 break-all">{error?.message || "不明なエラー"}</p>
-      </div>
-      <button
-        onClick={resetErrorBoundary}
-        className="flex items-center justify-center gap-2 w-full py-3 bg-[#00704A] text-white rounded-xl font-bold hover:bg-[#005c3d] transition-colors"
-      >
-        <RefreshCw className="w-4 h-4" />
-        再読み込みして復旧
-      </button>
+      <button onClick={resetErrorBoundary} className="py-3 px-6 bg-[#00704A] text-white rounded-xl font-bold">再試行</button>
     </div>
   </div>
 );
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [authLoading, setAuthLoading] = useState(false); 
-  const { stamps, isLoading: stampsLoading, isSyncing, isDirty, addStamps, deleteStamp, syncToCloud } = useStamps(user?.id || null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const { stamps, isLoading: stampsLoading, isSyncing, isDirty, addStamps, updateStamp, deleteStamp, syncToCloud } = useStamps(user?.id || null);
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [syncSuccess, setSyncSuccess] = useState(false);
@@ -44,6 +34,7 @@ const App: React.FC = () => {
     const monitorAuth = async () => {
       try {
         const { auth } = await initFirebase();
+        try { await getRedirectResult(auth); } catch (e) { console.warn(e); }
         onAuthStateChanged(auth, (firebaseUser) => {
           if (firebaseUser) {
             setUser({
@@ -56,9 +47,7 @@ const App: React.FC = () => {
             setUser(null);
           }
         });
-      } catch (e) {
-        console.error("Auth initialization error:", e);
-      }
+      } catch (e) { console.error(e); }
     };
     monitorAuth();
   }, []);
@@ -67,23 +56,18 @@ const App: React.FC = () => {
     setAuthLoading(true);
     try {
       const { auth, googleProvider } = await initFirebase();
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      setGlobalError(error?.message || "ログインに失敗しました。");
-    } finally {
-      setAuthLoading(false);
-    }
+      try { await signInWithPopup(auth, googleProvider); } catch (error: any) {
+        if (error?.code === 'auth/popup-blocked') await signInWithRedirect(auth, googleProvider);
+        else throw error;
+      }
+    } catch (error: any) { setGlobalError(error?.message || "ログイン失敗"); } finally { setAuthLoading(false); }
   };
 
   const handleLogout = async () => {
     if (!confirm('ログアウトしますか？')) return;
-    try {
-      const { auth } = await initFirebase();
-      await signOut(auth);
-      setUser(null);
-    } catch (error) {
-      setGlobalError("ログアウト中にエラーが発生しました。");
-    }
+    const { auth } = await initFirebase();
+    await signOut(auth);
+    setUser(null);
   };
 
   const handleManualSync = async () => {
@@ -91,138 +75,78 @@ const App: React.FC = () => {
       await syncToCloud();
       setSyncSuccess(true);
       setTimeout(() => setSyncSuccess(false), 3000);
-    } catch (error) {
-      setGlobalError("同期中にエラーが発生しました。");
-    }
+    } catch (error) { setGlobalError("同期失敗"); }
   };
 
   const storeCount = new Set(stamps?.map(s => s?.storeName)).size;
   const prefCount = new Set(stamps?.map(s => s?.prefecture)).size;
 
-  const showFullLoading = authLoading || (user && stampsLoading && stamps.length === 0);
-
-  // if (showFullLoading) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-  //       <div className="text-center">
-  //         <Loader2 className="w-12 h-12 text-[#00704A] animate-spin mx-auto mb-4" />
-  //         <p className="text-gray-500 font-medium animate-pulse">
-  //           {authLoading ? '認証中...' : 'コレクションを同期中...'}
-  //         </p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 text-[#00704A] animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => window.location.reload()}>
-      <div className="min-h-screen bg-[#f3f4f6] pb-24 font-sans animate-in fade-in duration-500">
+      <div className="min-h-screen bg-[#f3f4f6] pb-10 font-sans">
         {globalError && (
-          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-xl animate-in slide-in-from-top-4">
-            <div className="bg-red-600 text-white p-4 rounded-xl shadow-2xl flex items-center justify-between border-2 border-white/20">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-6 h-6 shrink-0" />
-                <p className="text-sm font-bold">{globalError}</p>
-              </div>
-              <button onClick={() => setGlobalError(null)} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
+          <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-xl bg-red-600 text-white p-2 rounded-lg text-[10px] flex justify-between">
+            {globalError} <button onClick={() => setGlobalError(null)}><X className="w-3 h-3" /></button>
           </div>
         )}
 
+        {/* ヘッダー: タブを排除して絶対に改行させない構成 */}
         <header className="bg-[#00704A] text-white shadow-lg sticky top-0 z-50">
-          <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="bg-white p-1.5 rounded-full shadow-inner">
-                  <Coffee className="w-5 h-5 text-[#00704A]" />
-                </div>
-                <h1 className="text-lg font-bold tracking-tight">Stamp Master</h1>
+          <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between overflow-hidden">
+            
+            {/* 左側: ロゴ + タイトル */}
+            <div className="flex items-center gap-2 shrink-0 min-w-0">
+              <div className="bg-white p-1 rounded-full shrink-0 shadow-sm">
+                <Coffee className="w-4 h-4 text-[#00704A]" />
               </div>
-              <nav className="flex items-center bg-black/10 rounded-full p-1 ml-2">
-                <button
-                  onClick={() => setActiveTab('list')}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === 'list' ? 'bg-white text-[#00704A] shadow-sm' : 'text-white/80 hover:text-white'}`}
-                >
-                  <List className="w-3.5 h-3.5" />
-                  リスト
-                </button>
-                <button
-                  onClick={() => setActiveTab('map')}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === 'map' ? 'bg-white text-[#00704A] shadow-sm' : 'text-white/80 hover:text-white'}`}
-                >
-                  <Map className="w-3.5 h-3.5" />
-                  マップ
-                </button>
-              </nav>
+              <h1 className="text-[14px] sm:text-xl font-black tracking-tight whitespace-nowrap overflow-hidden">Stamp Master</h1>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* 右側: 同期 & ユーザー/ログイン */}
+            <div className="flex items-center gap-2 shrink-0">
               {user && (
                 <button
                   onClick={handleManualSync}
                   disabled={isSyncing}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all relative ${
-                    isDirty 
-                      ? 'bg-amber-500 text-white shadow-md animate-pulse hover:bg-amber-600' 
-                      : syncSuccess 
-                        ? 'bg-emerald-500 text-white shadow-md' 
-                        : 'bg-white/10 text-white/80 hover:bg-white/20'
-                  }`}
+                  className={`p-2 rounded-full transition-all shadow-sm ${isDirty ? 'bg-amber-500 animate-pulse' : syncSuccess ? 'bg-emerald-500' : 'bg-white/10 hover:bg-white/20'}`}
                 >
-                  {isSyncing ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : syncSuccess ? (
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  ) : (
-                    <CloudUpload className="w-3.5 h-3.5" />
-                  )}
-                  <span className="hidden sm:inline">
-                    {isSyncing ? '同期中...' : syncSuccess ? '同期完了' : isDirty ? '未同期あり' : '同期済み'}
-                  </span>
+                  {isSyncing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : syncSuccess ? <CheckCircle2 className="w-3.5 h-3.5" /> : <CloudUpload className="w-3.5 h-3.5" />}
                 </button>
               )}
 
               {user ? (
-                <div className="flex items-center gap-3 pl-3 border-l border-white/20 group relative">
-                  <div className="text-right hidden sm:block">
-                    <p className="text-[10px] text-emerald-100 font-bold leading-none">Cloud Connected</p>
-                    <p className="text-xs font-bold leading-tight truncate max-w-[100px]">{user?.name}</p>
-                  </div>
-                  <img
-                    src={user?.picture}
-                    alt={user?.name}
-                    className="w-9 h-9 rounded-full border border-white/30 cursor-pointer"
-                  />
-                  <button
-                    onClick={handleLogout}
-                    className="absolute top-11 right-0 bg-white text-gray-800 px-4 py-2 rounded-xl text-xs font-bold shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all flex items-center gap-2 border border-gray-100 whitespace-nowrap"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2 pl-2 border-l border-white/20 group relative h-9">
+                  <img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full border border-white/30 cursor-pointer shadow-sm hover:border-white transition-all" />
+                  <button onClick={handleLogout} className="absolute top-11 right-0 bg-white text-gray-800 px-4 py-2 rounded-xl text-[11px] font-bold shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 border border-gray-100">
                     ログアウト
                   </button>
                 </div>
               ) : (
                 <button
                   onClick={handleLogin}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#00704A] hover:bg-emerald-50 rounded-full text-xs font-bold transition-all shadow-md"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-[#00704A] rounded-full text-[11px] sm:text-xs font-black shadow-lg hover:bg-emerald-50 transition-all active:scale-95 shrink-0"
                 >
-                  <LogIn className="w-4 h-4" />
-                  ログイン
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.86 32.659 29.296 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.843 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.954 4 4 12.954 4 24s8.954 20 20 20c11.046 0 20-8.954 20-20 0-1.341-.138-2.651-.389-3.917z" /><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.843 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4c-7.682 0-14.35 4.327-17.694 10.691z" /><path fill="#4CAF50" d="M24 44c5.195 0 9.892-1.989 13.461-5.23l-6.214-5.259C29.232 35.091 26.715 36 24 36c-5.274 0-9.818-3.317-11.279-7.946l-6.518 5.02C9.505 39.556 16.227 44 24 44z" /><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.056 5.511l.003-.002 6.214 5.259C36.971 39.205 44 34 44 24c0-1.341-.138-2.651-.389-3.917z" /></svg>
+                  <span className="hidden sm:inline">Googleでログイン</span>
+                  <span className="sm:hidden">ログイン</span>
                 </button>
               )}
             </div>
           </div>
         </header>
 
-        <main className="max-w-6xl mx-auto px-4 py-8">
+        <main className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-4 space-y-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative group">
-                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                  <Trophy className="w-24 h-24" />
-                </div>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative">
                 <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-6">Your Progress</h2>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
@@ -240,39 +164,42 @@ const App: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
-                {isDirty && user && (
-                  <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center justify-between">
-                    <p className="text-[10px] font-bold text-amber-700">クラウドに未保存の変更があります</p>
-                    <button 
-                      onClick={handleManualSync}
-                      className="text-[10px] font-black text-white bg-amber-500 px-3 py-1 rounded-full hover:bg-amber-600 transition-colors"
-                    >
-                      同期する
-                    </button>
-                  </div>
-                )}
               </div>
-
               <Uploader onAddStamps={addStamps} />
             </div>
 
-            <div className="lg:col-span-8 min-h-[400px]">
-              <Suspense fallback={
-                <div className="w-full h-[500px] flex flex-col items-center justify-center bg-white rounded-2xl border border-dashed border-gray-200">
-                  <Loader2 className="w-10 h-10 text-emerald-200 animate-spin mb-4" />
-                  <p className="text-gray-400 text-sm font-medium">コンポーネントを読込中...</p>
-                </div>
-              }>
+            <div className="lg:col-span-8 space-y-4">
+              {/* リスト/マップ切り替え: コンテンツの直上に配置 */}
+              <div className="flex justify-center sm:justify-start">
+                <nav className="inline-flex items-center bg-gray-200/50 rounded-xl p-1 shadow-inner">
+                  <button
+                    onClick={() => setActiveTab('list')}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'list' ? 'bg-white text-[#00704A] shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    <List className="w-4 h-4" />
+                    リスト表示
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('map')}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'map' ? 'bg-white text-[#00704A] shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    <Map className="w-4 h-4" />
+                    マップ表示
+                  </button>
+                </nav>
+              </div>
+
+              <Suspense fallback={<div className="flex justify-center p-20 bg-white rounded-2xl border border-gray-100"><Loader2 className="animate-spin text-[#00704A] opacity-20" /></div>}>
                 {activeTab === 'list' ? (
-                  <StoreList stamps={stamps || []} onDelete={deleteStamp} />
+                  <StoreList stamps={stamps || []} onDelete={deleteStamp} onUpdate={updateStamp} />
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-4 animate-in fade-in duration-500">
                     <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
-                      <h3 className="font-bold text-gray-700 flex items-center gap-2 px-2">
+                      <h3 className="font-black text-gray-700 flex items-center gap-2 px-2 text-xs uppercase tracking-widest">
                         <div className="w-2 h-2 rounded-full bg-[#00704A]" />
-                        店舗分布マップ
+                        Distribution Map
                       </h3>
+                      <p className="text-[10px] font-bold text-gray-400">全国の訪問店舗を可視化</p>
                     </div>
                     <StoreMap stamps={stamps || []} />
                   </div>

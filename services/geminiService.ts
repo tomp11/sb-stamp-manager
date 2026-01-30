@@ -40,13 +40,21 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
     return MOCK_DATA;
   }
 
-  // Fix: Strictly follow the mandatory hybrid environment variable access format as requested.
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : '');
-  const ai = new GoogleGenAI({apiKey:  apiKey });
+  // Hybrid reference as per mandatory environment variable rules
+  // const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : '');
+  
+  // // Rule: Synchronize process.env.API_KEY for the SDK to use directly.
+  // if (apiKey && typeof process !== 'undefined') {
+  //   process.env.API_KEY = apiKey;
+  // }
+  console.log(process.env)
+  throw new Error(debugInfo);
+  // Rule: Must use new GoogleGenAI({ apiKey: process.env.API_KEY })
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   console.log("Gemini API: 解析開始...");
-
-  // Fix: Move static extraction rules to systemInstruction for better model control.
+  
+  // Set extraction logic within systemInstruction for enhanced model consistency.
   const systemInstruction = `
     あなたはスターバックスの「マイストアパスポート」のスタンプ画像を解析する専門家です。
     画像から以下の情報を抽出し、JSON形式で返却してください。
@@ -62,6 +70,7 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
 
     【重要】
     - 入力画像には複数のスタンプが並んでいる（グリッド表示）場合と、1つの店舗の詳細画面の場合があります。
+    - グリッド表示の場合、最終訪問日と訪問回数は nullになります。
     - 全ての検出された店舗を stamps 配列に含めてください。
     - 緯度・経度は住所から推測するのではなく、可能な限り実際の店舗位置に合致する正確な値を出力してください。
   `;
@@ -74,7 +83,7 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
   };
 
   try {
-    // Fix: Upgrade to gemini-3-pro-preview for complex reasoning tasks like image data extraction.
+    // Upgrading to gemini-3-pro-preview for complex multimodal reasoning tasks.
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: { parts: [imagePart, { text: "画像から店舗スタンプの情報を抽出してください。" }] },
@@ -106,10 +115,10 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
       },
     });
 
-    // Fix: Access the .text property directly (do not call as a method) as per Google GenAI SDK rules.
+    // Directly access .text property as per the Google GenAI SDK rules (property, not method).
     const text = response.text;
     if (!text) throw new Error("AIから空のレスポンスが返されました。");
-
+    
     const parsed = JSON.parse(text.trim());
     return (parsed.stamps || []).map((s: any) => ({
       ...s,
