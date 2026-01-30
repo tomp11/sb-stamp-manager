@@ -171,7 +171,7 @@ export const useStamps = (userId: string | null) => {
       if (!userId) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
       } else {
-        setIsDirty(true);
+        setIsDirty(true); 
       }
       return newList;
     });

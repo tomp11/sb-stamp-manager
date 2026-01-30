@@ -46,8 +46,8 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
   const ai = new GoogleGenAI({apiKey:  apiKey });
 
   console.log("Gemini API: 解析開始...");
-
-  // Fix: Move static extraction rules to systemInstruction for better model control.
+  
+  // Set extraction logic within systemInstruction for enhanced model consistency.
   const systemInstruction = `
     あなたはスターバックスの「マイストアパスポート」のスタンプ画像を解析する専門家です。
     画像から以下の情報を抽出し、JSON形式で返却してください。
@@ -78,7 +78,7 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
   };
 
   try {
-    // Fix: Upgrade to gemini-3-pro-preview for complex reasoning tasks like image data extraction.
+    // Upgrading to gemini-3-pro-preview for complex multimodal reasoning tasks.
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: { parts: [imagePart, { text: "画像から店舗スタンプの情報を抽出してください。" }] },
@@ -110,10 +110,10 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
       },
     });
 
-    // Fix: Access the .text property directly (do not call as a method) as per Google GenAI SDK rules.
+    // Directly access .text property as per the Google GenAI SDK rules (property, not method).
     const text = response.text;
     if (!text) throw new Error("AIから空のレスポンスが返されました。");
-
+    
     const parsed = JSON.parse(text.trim());
     return (parsed.stamps || []).map((s: any) => ({
       ...s,

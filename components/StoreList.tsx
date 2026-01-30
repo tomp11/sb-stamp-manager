@@ -75,7 +75,7 @@ const StoreList: React.FC<StoreListProps> = ({ stamps, onDelete, onUpdate }) => 
                 <X className="w-6 h-6" />
               </button>
             </div>
-
+            
             <form onSubmit={handleEditSave} className="p-6 space-y-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">店舗名</label>
@@ -166,11 +166,11 @@ const StoreList: React.FC<StoreListProps> = ({ stamps, onDelete, onUpdate }) => 
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-
+        
         <div className="flex items-center justify-between w-full sm:w-auto gap-4">
           <div className="flex sm:hidden items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
             <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
-            <select
+            <select 
               className="text-xs font-bold bg-transparent outline-none text-gray-600 appearance-none pr-4"
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as SortKey)}
@@ -181,7 +181,7 @@ const StoreList: React.FC<StoreListProps> = ({ stamps, onDelete, onUpdate }) => 
               {sortOrder === 'asc' ? <ChevronUp className="w-4 h-4 text-[#00704A]" /> : <ChevronDown className="w-4 h-4 text-[#00704A]" />}
             </button>
           </div>
-
+          
           <p className="text-sm text-gray-500 font-medium whitespace-nowrap">
             登録数: <span className="text-[#00704A] font-bold">{filteredStamps.length}件</span>
           </p>
@@ -267,7 +267,7 @@ const StoreList: React.FC<StoreListProps> = ({ stamps, onDelete, onUpdate }) => 
                 <div>
                   <h4 className="font-black text-gray-900 leading-snug">{stamp?.storeName}</h4>
                   <p className="text-[10px] text-gray-400 flex items-center mt-1">
-                    <MapPin className="w-2.5 h-2.5 mr-1 shrink-0" />
+                    <MapPin className="w-2.5 h-2.5 mr-1 shrink-0" /> 
                     <span className="line-clamp-1">{stamp?.address}</span>
                   </p>
                 </div>
@@ -276,7 +276,7 @@ const StoreList: React.FC<StoreListProps> = ({ stamps, onDelete, onUpdate }) => 
                 {stamp?.prefecture}
               </span>
             </div>
-
+            
             <div className="flex items-center justify-between mt-4">
               <div className="flex gap-2">
                 <div className={`flex items-center px-2 py-1 rounded-lg text-[10px] font-black border ${stamp?.visitCount !== undefined ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>

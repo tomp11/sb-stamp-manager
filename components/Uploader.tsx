@@ -2,16 +2,16 @@
 import React, { useState, useRef } from 'react';
 import { extractStampData } from '../services/geminiService';
 import { StoreStamp } from '../types';
-import {
-  Upload,
-  Loader2,
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  ShieldCheck,
-  Image as ImageIcon,
-  LayoutGrid,
-  ArrowLeft
+import { 
+  Upload, 
+  Loader2, 
+  AlertCircle, 
+  CheckCircle2, 
+  Clock, 
+  ShieldCheck, 
+  Image as ImageIcon, 
+  LayoutGrid, 
+  ArrowLeft 
 } from 'lucide-react';
 
 interface UploaderProps {
@@ -29,9 +29,9 @@ type UploadStep = 'idle' | 'select' | 'processing';
 
 const Uploader: React.FC<UploaderProps> = ({ onAddStamps }) => {
   const [step, setStep] = useState<UploadStep>('idle');
-  const [error, setError] = useState<{ message: string, isQuota: boolean } | null>(null);
+  const [error, setError] = useState<{message: string, isQuota: boolean} | null>(null);
   const [summary, setSummary] = useState<UploadSummary | null>(null);
-  const [isMockMode, setIsMockMode] = useState(false);
+  const [isMockMode, setIsMockMode] = useState(false); 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const resizeImage = (file: File): Promise<string> => {
@@ -119,8 +119,8 @@ const Uploader: React.FC<UploaderProps> = ({ onAddStamps }) => {
       const msg = err?.message || "";
       const isQuota = msg?.includes('429') || msg?.toLowerCase()?.includes('quota') || msg?.includes('RESOURCE_EXHAUSTED');
       setError({
-        message: isQuota
-          ? "API制限に達しました。デモモードをオンにすると、APIを消費せずにテストできます。"
+        message: isQuota 
+          ? "API制限に達しました。デモモードをオンにすると、APIを消費せずにテストできます。" 
           : msg,
         isQuota
       });
@@ -131,7 +131,7 @@ const Uploader: React.FC<UploaderProps> = ({ onAddStamps }) => {
   return (
     <div className="space-y-4">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
-
+        
         {/* モード切替エリア */}
         <div className="flex justify-between items-center mb-4">
           <label className="flex items-center gap-2 cursor-pointer group">
@@ -150,21 +150,22 @@ const Uploader: React.FC<UploaderProps> = ({ onAddStamps }) => {
           </label>
         </div>
 
-        <input
-          type="file"
+        <input 
+          type="file" 
           ref={fileInputRef}
-          accept="image/*"
-          onChange={handleFileChange}
-          className="hidden"
+          accept="image/*" 
+          onChange={handleFileChange} 
+          className="hidden" 
         />
 
-        <div className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 sm:p-10 transition-all relative ${step === 'processing' ? 'border-gray-100 bg-gray-50' : 'border-gray-200'
-          }`}>
-
+        <div className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 sm:p-10 transition-all relative ${
+          step === 'processing' ? 'border-gray-100 bg-gray-50' : 'border-gray-200'
+        }`}>
+          
           {/* STEP 1: 初期状態 */}
           {step === 'idle' && (
-            <div
-              className="flex flex-col items-center cursor-pointer w-full py-4"
+            <div 
+              className="flex flex-col items-center cursor-pointer w-full py-4" 
               onClick={() => setStep('select')}
             >
               <div className="bg-[#E6F1ED] p-4 sm:p-5 rounded-full mb-3 sm:mb-4 hover:scale-110 transition-transform">
@@ -180,16 +181,16 @@ const Uploader: React.FC<UploaderProps> = ({ onAddStamps }) => {
           {/* STEP 2: 選択ガイド */}
           {step === 'select' && (
             <div className="w-full animate-in fade-in zoom-in duration-300">
-              <div
-                className="flex items-center gap-2 mb-6 cursor-pointer hover:text-gray-800 text-gray-400 transition-colors"
+              <div 
+                className="flex items-center gap-2 mb-6 cursor-pointer hover:text-gray-800 text-gray-400 transition-colors" 
                 onClick={() => setStep('idle')}
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span className="text-xs font-bold">戻る</span>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div
-                  onClick={openFilePicker}
+                <div 
+                  onClick={openFilePicker} 
                   className="flex flex-col items-center p-4 bg-emerald-50/50 hover:bg-emerald-50 rounded-xl cursor-pointer border border-transparent hover:border-emerald-200 transition-all group"
                 >
                   <div className="bg-white p-3 rounded-lg shadow-sm mb-3 group-hover:scale-110 transition-transform">
@@ -197,8 +198,8 @@ const Uploader: React.FC<UploaderProps> = ({ onAddStamps }) => {
                   </div>
                   <span className="text-[11px] font-bold text-gray-700">スタンプ1枚</span>
                 </div>
-                <div
-                  onClick={openFilePicker}
+                <div 
+                  onClick={openFilePicker} 
                   className="flex flex-col items-center p-4 bg-emerald-50/50 hover:bg-emerald-50 rounded-xl cursor-pointer border border-transparent hover:border-emerald-200 transition-all group"
                 >
                   <div className="bg-white p-3 rounded-lg shadow-sm mb-3 group-hover:scale-110 transition-transform">

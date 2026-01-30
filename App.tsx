@@ -8,6 +8,8 @@ import { useStamps } from './hooks/useStamps';
 import { initFirebase, onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from './services/firebase';
 import { Coffee, List, Map, Trophy, AlertCircle, X, Loader2, LogIn, LogOut, CloudUpload, CheckCircle2, RefreshCw } from 'lucide-react';
 
+import { initFirebase, onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from './services/firebase';
+import { Coffee, List, Map, Trophy, AlertCircle, X, Loader2, LogIn, LogOut, CloudUpload, CheckCircle2, RefreshCw } from 'lucide-react';
 
 const StoreMap = lazy(() => import('./components/StoreMap'));
 
@@ -21,12 +23,15 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetError
       <button onClick={resetErrorBoundary} className="py-3 px-6 bg-[#00704A] text-white rounded-xl font-bold">
         再試行
       </button>
+      <button onClick={resetErrorBoundary} className="py-3 px-6 bg-[#00704A] text-white rounded-xl font-bold">再試行</button>
     </div>
   </div>
 );
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const { stamps, isLoading: stampsLoading, isSyncing, isDirty, addStamps, updateStamp, deleteStamp, syncToCloud } = useStamps(user?.id || null);
   const [authLoading, setAuthLoading] = useState(false);
   const { stamps, isLoading: stampsLoading, isSyncing, isDirty, addStamps, updateStamp, deleteStamp, syncToCloud } = useStamps(user?.id || null);
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
@@ -37,6 +42,7 @@ const App: React.FC = () => {
     const monitorAuth = async () => {
       try {
         const { auth } = await initFirebase();
+        try { await getRedirectResult(auth); } catch (e) { console.warn(e); }
         try { await getRedirectResult(auth); } catch (e) { console.warn(e); }
         onAuthStateChanged(auth, (firebaseUser) => {
           if (firebaseUser) {
@@ -50,6 +56,7 @@ const App: React.FC = () => {
             setUser(null);
           }
         });
+      } catch (e) { console.error(e); }
       } catch (e) { console.error(e); }
     };
     monitorAuth();
@@ -101,16 +108,19 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* ヘッダー: タブなし・アイコン潰れ防止版 */}
+        {/* ヘッダー: タブを排除して絶対に改行させない構成 */}
         <header className="bg-[#00704A] text-white shadow-lg sticky top-0 z-50">
-          <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-            <div className="flex items-center gap-2 shrink-0">
+          <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between overflow-hidden">
+            
+            {/* 左側: ロゴ + タイトル */}
+            <div className="flex items-center gap-2 shrink-0 min-w-0">
               <div className="bg-white p-1 rounded-full shrink-0 shadow-sm">
                 <Coffee className="w-4 h-4 text-[#00704A]" />
               </div>
-              <h1 className="text-[14px] sm:text-xl font-black tracking-tight whitespace-nowrap">SB Stamp Collection</h1>
+              <h1 className="text-[14px] sm:text-xl font-black tracking-tight whitespace-nowrap overflow-hidden">Stamp Master</h1>
             </div>
 
+            {/* 右側: 同期 & ユーザー/ログイン */}
             <div className="flex items-center gap-2 shrink-0">
               {user && (
                 <button
@@ -132,14 +142,9 @@ const App: React.FC = () => {
               ) : (
                 <button
                   onClick={handleLogin}
-                  className="flex items-center justify-center flex-nowrap whitespace-nowrap gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white text-[#00704A] hover:bg-emerald-50 rounded-full text-[11px] sm:text-xs font-bold transition-all shadow-md shrink-0 min-w-fit"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-[#00704A] rounded-full text-[11px] sm:text-xs font-black shadow-lg hover:bg-emerald-50 transition-all active:scale-95 shrink-0"
                 >
-                  <svg className="w-4 h-4 shrink-0 min-w-[16px] min-h-[16px]" viewBox="0 0 48 48">
-                    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.86 32.659 29.296 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.843 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.954 4 4 12.954 4 24s8.954 20 20 20c11.046 0 20-8.954 20-20 0-1.341-.138-2.651-.389-3.917z" />
-                    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.843 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4c-7.682 0-14.35 4.327-17.694 10.691z" />
-                    <path fill="#4CAF50" d="M24 44c5.195 0 9.892-1.989 13.461-5.23l-6.214-5.259C29.232 35.091 26.715 36 24 36c-5.274 0-9.818-3.317-11.279-7.946l-6.518 5.02C9.505 39.556 16.227 44 24 44z" />
-                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.056 5.511l.003-.002 6.214 5.259C36.971 39.205 44 34 44 24c0-1.341-.138-2.651-.389-3.917z" />
-                  </svg>
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.86 32.659 29.296 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.843 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.954 4 4 12.954 4 24s8.954 20 20 20c11.046 0 20-8.954 20-20 0-1.341-.138-2.651-.389-3.917z" /><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.843 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4c-7.682 0-14.35 4.327-17.694 10.691z" /><path fill="#4CAF50" d="M24 44c5.195 0 9.892-1.989 13.461-5.23l-6.214-5.259C29.232 35.091 26.715 36 24 36c-5.274 0-9.818-3.317-11.279-7.946l-6.518 5.02C9.505 39.556 16.227 44 24 44z" /><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.056 5.511l.003-.002 6.214 5.259C36.971 39.205 44 34 44 24c0-1.341-.138-2.651-.389-3.917z" /></svg>
                   <span className="hidden sm:inline">Googleでログイン</span>
                   <span className="sm:hidden">ログイン</span>
                 </button>
@@ -174,22 +179,22 @@ const App: React.FC = () => {
             </div>
 
             <div className="lg:col-span-8 space-y-4">
-              {/* リスト/マップ切り替えボタンをここに移植 */}
+              {/* リスト/マップ切り替え: コンテンツの直上に配置 */}
               <div className="flex justify-center sm:justify-start">
                 <nav className="inline-flex items-center bg-gray-200/50 rounded-xl p-1 shadow-inner">
                   <button
                     onClick={() => setActiveTab('list')}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-black transition-all whitespace-nowrap ${activeTab === 'list' ? 'bg-white text-[#00704A] shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'list' ? 'bg-white text-[#00704A] shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
                   >
-                    <List className="w-4 h-4 shrink-0" />
-                    <span>リスト表示</span>
+                    <List className="w-4 h-4" />
+                    リスト表示
                   </button>
                   <button
                     onClick={() => setActiveTab('map')}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-black transition-all whitespace-nowrap ${activeTab === 'map' ? 'bg-white text-[#00704A] shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'map' ? 'bg-white text-[#00704A] shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
                   >
-                    <Map className="w-4 h-4 shrink-0" />
-                    <span>マップ表示</span>
+                    <Map className="w-4 h-4" />
+                    マップ表示
                   </button>
                 </nav>
               </div>

@@ -30,12 +30,12 @@ const getEnvVal = (key: string): string | undefined => {
 };
 
 const firebaseConfig = {
-  apiKey: getEnvVal('API_KEY'),
-  authDomain: getEnvVal('AUTH_DOMAIN'),
-  projectId: getEnvVal('PROJECT_ID'),
-  storageBucket: getEnvVal('STORAGE_BUCKET'),
-  messagingSenderId: getEnvVal('MESSAGING_SENDER_ID'),
-  appId: getEnvVal('APP_ID')
+  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || (typeof process !== 'undefined' ? process.env.VITE_FIREBASE_API_KEY : ''),
+  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || (typeof process !== 'undefined' ? process.env.VITE_FIREBASE_AUTH_DOMAIN : ''),
+  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID || (typeof process !== 'undefined' ? process.env.VITE_FIREBASE_PROJECT_ID : ''),
+  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || (typeof process !== 'undefined' ? process.env.VITE_FIREBASE_STORAGE_BUCKET : ''),
+  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || (typeof process !== 'undefined' ? process.env.VITE_FIREBASE_MESSAGING_SENDER_ID : ''),
+  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || (typeof process !== 'undefined' ? process.env.VITE_FIREBASE_APP_ID : '')
 };
 
 let app: FirebaseApp | null = null;
@@ -49,6 +49,12 @@ if (isConfigValid) {
   try {
     app = initializeApp(firebaseConfig as any);
     auth = getAuth(app);
+    // 認証状態をタブ/リロード間で保持（Safari等でも安定しやすい）
+    // init時に1回だけ設定しておく
+    setPersistence(auth, browserLocalPersistence).catch((e) => {
+      console.warn("Auth persistence setup failed:", e);
+    });
+
     // 認証状態をタブ/リロード間で保持（Safari等でも安定しやすい）
     // init時に1回だけ設定しておく
     setPersistence(auth, browserLocalPersistence).catch((e) => {
@@ -71,6 +77,8 @@ if (isConfigValid) {
       ignoreUndefinedProperties: true,
       localCache: persistentLocalCache({
         tabManager: persistentMultipleTabManager()
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
       }),
       experimentalForceLongPolling: true, // ネットワークハング防止を継続
     });
@@ -88,6 +96,15 @@ export const getFirebaseInstance = () => {
 
 export const initFirebase = async () => getFirebaseInstance();
 
+export {
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut,
+  setPersistence,
+  browserLocalPersistence,
+};
 export {
   onAuthStateChanged,
   signInWithPopup,
