@@ -42,6 +42,7 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
 
   // Fix: Strictly follow the mandatory hybrid environment variable access format as requested.
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : '');
+  console.log("Gemini API Key:", apiKey);
   const ai = new GoogleGenAI({apiKey:  apiKey });
 
   console.log("Gemini API: 解析開始...");
@@ -62,6 +63,9 @@ export const extractStampData = async (base64Image: string, isMock: boolean = fa
 
     【重要】
     - 入力画像には複数のスタンプが並んでいる（グリッド表示）場合と、1つの店舗の詳細画面の場合があります。
+    - 画像にスタンプが一枚も検出されない場合は、空の配列を返却してください。
+    - グリッド表示の場合、最終訪問日と訪問回数は nullになります。
+    - 1つの店舗の詳細画面の場合、最終訪問日と訪問回数は記載されています。
     - 全ての検出された店舗を stamps 配列に含めてください。
     - 緯度・経度は住所から推測するのではなく、可能な限り実際の店舗位置に合致する正確な値を出力してください。
   `;

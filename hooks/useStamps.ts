@@ -5,7 +5,7 @@ import { loadStampsFromDB, saveStampsToDB, deleteStampFromDB } from '../services
 
 const STORAGE_KEY = 'my_store_passports';
 
-const normalizeStoreName = (name: string) => 
+const normalizeStoreName = (name: string) =>
   (name || '').trim().normalize('NFKC').replace(/\s+/g, '').replace(/[（(]/g, '(').replace(/[）)]/g, ')');
 
 export const useStamps = (userId: string | null) => {
@@ -40,14 +40,14 @@ export const useStamps = (userId: string | null) => {
     setIsLoading(true);
     try {
       const cloudStamps = await loadStampsFromDB(currentUserId);
-      
+
       if (initialLocalStamps.length > 0) {
         const cloudMap = new Map();
         cloudStamps.forEach(s => cloudMap.set(normalizeStoreName(s.storeName), s));
 
         const stampsToUpload: StoreStamp[] = [];
         const mergedList = [...cloudStamps];
-        
+
         initialLocalStamps.forEach(localS => {
           const normalizedName = normalizeStoreName(localS.storeName);
           const existingCloud = cloudMap.get(normalizedName);
@@ -137,7 +137,7 @@ export const useStamps = (userId: string | null) => {
           added++;
         }
       });
-      
+
       if (!userId) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedList));
       } else {
@@ -149,20 +149,37 @@ export const useStamps = (userId: string | null) => {
     return { added, updated, skipped };
   }, [userId]);
 
+  const updateStamp = useCallback((updatedStamp: StoreStamp) => {
+    setStamps(prev => {
+      const newList = prev.map(s => s.id === updatedStamp.id ? updatedStamp : s);
+      if (!userId) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
+      } else {
+        // 【改善】ログイン済みの場合は、即座にFirebaseへ自動同期を試みる
+        saveStampsToDB([updatedStamp], userId).catch(err => {
+          console.error("Auto-sync failed on update:", err);
+          setIsDirty(true); // 同期に失敗した場合は未同期フラグを立てる（後で手動同期可能）
+        });
+      }
+      return newList;
+    });
+  }, [userId]);
+
   const deleteStamp = useCallback((id: string) => {
     setStamps(prev => {
       const newList = prev.filter(s => s.id !== id);
       if (!userId) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
       } else {
-        setIsDirty(true); // ログイン中は未同期フラグを立てる
+        setIsDirty(true);
       }
       return newList;
     });
+    // 削除も即座に反映
     if (userId) {
       deleteStampFromDB(userId, id).catch(console.error);
     }
   }, [userId]);
 
-  return { stamps, isLoading, isSyncing, isDirty, addStamps, deleteStamp, syncToCloud };
+  return { stamps, isLoading, isSyncing, isDirty, addStamps, updateStamp, deleteStamp, syncToCloud };
 };
